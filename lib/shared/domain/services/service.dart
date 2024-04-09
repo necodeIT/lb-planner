@@ -1,9 +1,10 @@
 import 'package:logging/logging.dart';
+import 'package:lb_planner/shared/shared.dart';
 
 /// Base class for all services.
 ///
 /// Provides a method for logging messages and errors.
-abstract class Service {
+abstract class Service implements ILoggable {
   /// THe name of the data source.
   final String _name;
 
@@ -14,7 +15,7 @@ abstract class Service {
 
   Logger get _log => Logger("Service.$_name.$runtimeType");
 
-  /// Logs a [message] with optional [error] and [stackTrace].
+  @override
   void log(Object message, [Object? error, StackTrace? stackTrace]) {
     if (error != null) {
       _log.warning(message, error, stackTrace);
