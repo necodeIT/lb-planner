@@ -1,3 +1,4 @@
+import 'package:lb_planner/features/slot_booking/presentation/screens/slot_booking_screen.dart';
 import 'package:lb_planner/features/themes/themes.dart';
 import 'package:lb_planner/shared/shared.dart';
 import 'package:auto_route/auto_route.dart';
@@ -109,8 +110,10 @@ class AppRouter extends _$AppRouter {
           path: '/theme-development',
         ),
         DefaultRoute(
-          page: LoginRoute.page,
-          path: '/login',
+          page: ScheduleRoute.page,
+          path: '/schedule',
+          initial: true,
+          title: (context, data) => "Slot Booking",
         )
       ];
 }
@@ -118,6 +121,7 @@ class AppRouter extends _$AppRouter {
 /// Implements [CustomRoute] with some default settings.
 class DefaultRoute extends CustomRoute {
   /// Implements [CustomRoute] with some default settings.
-  DefaultRoute({required super.page, required super.path, super.initial})
+  DefaultRoute(
+      {required super.page, required super.path, super.initial, super.title})
       : super(transitionsBuilder: TransitionsBuilders.noTransition);
 }

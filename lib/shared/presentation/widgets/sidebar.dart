@@ -61,6 +61,10 @@ class Sidebar extends ConsumerWidget {
                         // TODO: swap with dashboard route once implemented
                         route: ThemeDevelopmentRoute(),
                       ),
+                      SidebarItem(
+                        icon: Icons.book_online,
+                        route: ScheduleRoute(),
+                      ),
                       SizedBox(height: 10),
                       SidebarItem(
                         icon: Icons.calendar_month,
