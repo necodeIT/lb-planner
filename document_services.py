@@ -9,7 +9,6 @@ WARN_TAB = "    \033[43m \033[0m "
 class SlotsDict:
     @property
     def __dict__(self):
-        print("starting __dict__")
         slots = tuple()
 
         for cls in self.__class__.__mro__:
@@ -17,12 +16,27 @@ class SlotsDict:
                 slots = cls.__slots__ + slots
         return {name: self.__getattribute__(name) for name in slots}
 
-class ReturnsInfo(SlotsDict):
+class ReturnInfo(SlotsDict):
     __slots__ = ('type', 'description')
 
     def __init__(self, type: str, description: str):
         self.type = type
         self.description = description
+
+class ParamInfo(SlotsDict):
+    __slots__ = ('type', 'description', 'required', 'default_value', 'nullable')
+
+    def __init__(self,
+                 type: str,
+                 description: str,
+                 required: bool,
+                 default_value: str | None,
+                 nullable: bool):
+        self.type = type
+        self.description = description
+        self.required = required
+        self.default_value = default_value
+        self.nullable = nullable
 
 class FunctionInfo(SlotsDict):
     __slots__ = ('name', 'group', 'capabilities', 'description', 'path')
@@ -39,8 +53,8 @@ class FunctionInfoEx(FunctionInfo):
 
     def __init__(self,
                  parent: FunctionInfo,
-                 parameters: dict[str, dict[str, str | bool | None]],
-                 returns: dict[str, ReturnsInfo],
+                 parameters: dict[str, ParamInfo],
+                 returns: dict[str, ReturnInfo],
                  returns_multiple: bool):
         super().__init__(**parent.__dict__)
 
@@ -146,7 +160,7 @@ def parse_imports(input_str: str, symbol: str) -> str:
     else:
         return fp_l[0]
 
-def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnsInfo], bool]:
+def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
     pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
     redir_pattern = r"(\w+)::(\w+)\(\)"
 
@@ -174,7 +188,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
     output_dict = {}
     for match in matches:
         key, value_type, description = match
-        output_dict[key] = ReturnsInfo(convert_param_type_to_normal_type(value_type), description)
+        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
 
     # Check for the presence of 'external_multiple_structure'
     is_multiple_structure = "external_multiple_structure" in input_str
@@ -193,7 +207,7 @@ def convert_param_type_to_normal_type(param_type: str) -> str:
     return CONVERSIONS.get(param_type, param_type)
 
 
-def parse_params(input_text: str) -> dict[str, dict[str, str | bool | None]]:
+def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
     pattern = r"'(\w+)' => new external_value\s*\(\s*(\w+)\s*,\s*'([^']+)',\s*(\w+),\s*([\w\d]+|\w+),\s*(\w+)\s*\)"
 
@@ -203,13 +217,13 @@ def parse_params(input_text: str) -> dict[str, dict[str, str | bool | None]]:
     result = {}
     for match in matches:
         param_name = match[0]
-        result[param_name] = {
-            "type": convert_param_type_to_normal_type(match[1]),
-            "description": match[2],
-            "required": True if match[3] == "VALUE_REQUIRED" else False,
-            "default_value": match[4] if match[4] != "null" else None,
-            "nullable": False if match[5] == "NULL_NOT_ALLOWED" else True,
-        }
+        result[param_name] = ParamInfo(
+            convert_param_type_to_normal_type(match[1]),
+            match[2],
+            True if match[3] == "VALUE_REQUIRED" else False,
+            match[4] if match[4] != "null" else None,
+            False if match[5] == "NULL_NOT_ALLOWED" else True,
+        )
 
     return result
 
