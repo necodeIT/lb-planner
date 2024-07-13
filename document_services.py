@@ -3,7 +3,12 @@ import re
 import sys
 from os import path
 
-def extract_function_info(file_content):
+from typing import Any
+
+WARN = "\033[43m\033[30mWARN:\033[0m "
+WARN_TAB = "    \033[43m \033[0m "
+
+def extract_function_info(file_content: str) -> list[dict[str, str | None]]:
     function_info = []
 
     # Removing comments, PHP tags, and definitions
@@ -25,7 +30,12 @@ def extract_function_info(file_content):
 
         # Extracting and adjusting capabilities
         capabilities = re.search(r"'capabilities' => '.*:(.*?)'", function[1])
-        func_dict["capabilities"] = capabilities.group(1) if capabilities else None
+        if capabilities is None:
+            # check if call needs no capabilities
+            capabilities = re.search(r"'capabilities' => ''", function[1])
+            func_dict["capabilities"] = "" if capabilities else None
+        else:
+            func_dict["capabilities"] = capabilities.group(1)
 
         # Extracting description
         description = re.search(r"'description' => '(.*?)'", function[1])
@@ -38,28 +48,37 @@ def extract_function_info(file_content):
         # Only adding to the list if all information is present
         if all(value is not None for value in func_dict.values()):
             function_info.append(func_dict)
+        else:
+            print(WARN, f"Could not gather all info for {func_dict["function_name"]}")
+            print(WARN_TAB, func_dict)
 
     return function_info
 
 
-def extract_php_functions(php_code):
+def extract_php_functions(php_code: str, name: str) -> tuple[str | None, str | None]:
     # Regular expression to match the function names and bodies
-    pattern = re.compile(r"(public static function \w+_(?:returns|parameters).*?{.*?})", re.DOTALL)
+    # https://regex101.com/r/9GtIMA
+    pattern = re.compile(r"(public static function (\w+_(?:returns|parameters))[^\w].*?{.*?})", re.DOTALL)
 
     # Find all matches in the PHP code
-    matches = pattern.findall(php_code)
+    matches: list[tuple[str, str]] = pattern.findall(php_code)
 
     parameters_function = None
     returns_function = None
 
     for match in matches:
         # Extract function name
-        function_name = re.search(r"public static function (\w+)", match).group(1)
+        function_name = match[1]
 
         if function_name.endswith("_parameters"):
-            parameters_function = match
+            parameters_function = match[0]
         elif function_name.endswith("_returns"):
-            returns_function = match
+            returns_function = match[0]
+
+    if parameters_function is None:
+        print(WARN, f"Couldn't find parameters function in {name}")
+    if returns_function is None:
+        print(WARN, f"Couldn't find returns function in {name}")
 
     return parameters_function, returns_function
 
@@ -78,7 +97,7 @@ def parse_imports(input_str: str, symbol: str) -> str:
         if namespace is not None:
             p[0] = namespace
 
-        fp_l.append(path.join("lbplanner",*p,f"{symbol}.php"))
+        fp_l.append(path.join("lbplanner", *p, f"{symbol}.php"))
 
     if len(fp_l) > 1:
         raise Exception("found import collision?")
@@ -87,29 +106,28 @@ def parse_imports(input_str: str, symbol: str) -> str:
     else:
         return fp_l[0]
 
-def parse_returns(input_str: str, file_content: str):
+def parse_returns(input_str: str, file_content: str, name: str):
     pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
     redir_pattern = r"(\w+)::(\w+)\(\)"
 
     matches = re.findall(redir_pattern, input_str)
     if len(matches) > 1:
-        raise Exception(f"Couldn't parse return values")
+        raise Exception(f"Couldn't parse return values in {name}")
 
     if len(matches) == 1:
         match = matches[0]
         meth_pattern = rf"public static function {match[1]}\(\)(?: ?: ?\w+)? ?{{(?P<body>.*?)}}"
 
         fp = parse_imports(file_content, match[0])
-        with open(fp,"r") as f:
+        with open(fp, "r") as f:
             new_file_content = f.read()
-            matches = re.findall(meth_pattern,new_file_content,re.DOTALL)
+            matches = re.findall(meth_pattern, new_file_content, re.DOTALL)
             if len(matches) == 0:
                 raise Exception(f"Couldn't find {match[0]}::{match[1]}() inside {fp}")
             elif len(matches) > 1:
                 raise Exception(f"Found multiple definitions for {match[0]}::{match[1]}() inside {fp}")
             else:
-                r= parse_returns(matches[0],new_file_content)
-                return r
+                return parse_returns(matches[0], new_file_content, fp)
 
     matches = re.findall(pattern, input_str)
 
@@ -124,7 +142,7 @@ def parse_returns(input_str: str, file_content: str):
     return output_dict, is_multiple_structure
 
 
-def convert_param_type_to_normal_type(param_type):
+def convert_param_type_to_normal_type(param_type: str) -> str:
     CONVERSIONS = {
         "PARAM_INT": "int",
         "PARAM_TEXT": "String",
@@ -135,7 +153,7 @@ def convert_param_type_to_normal_type(param_type):
     return CONVERSIONS.get(param_type, param_type)
 
 
-def parse_params(input_text):
+def parse_params(input_text: str) -> dict[str, dict[str, str | bool | None]]:
     # Regular expression to match the parameters inside the 'new external_value()' function
     pattern = r"'(\w+)' => new external_value\s*\(\s*(\w+)\s*,\s*'([^']+)',\s*(\w+),\s*([\w\d]+|\w+),\s*(\w+)\s*\)"
 
@@ -264,7 +282,7 @@ function displayFunctionDetails(func) {
     <h2>Capabilities</h2>
     <hr />
     <p>${func.capabilities}</p>
-    <h2>Parmeters</h2>
+    <h2>Parameters</h2>
     <hr />
     ${Object.keys(func.parameters).map(param => `
     <div class="param">
@@ -318,16 +336,22 @@ document.getElementById('search').addEventListener('keyup', searchFunction);
 if __name__ == "__main__":
     with open("lbplanner/db/services.php", "r") as file:
         content = file.read()
-        info = extract_function_info(content)
+        infos = extract_function_info(content)
 
         complete_info = []
 
-        for i, info in enumerate(info):
+        for i, info in enumerate(infos):
+            if info["path"] is None:
+                print(WARN, "skipped")
+                continue
             with open(info["path"], "r") as func_file:
                 func_content = func_file.read()
-                params_func, returns_func = extract_php_functions(func_content)
+                params_func, returns_func = extract_php_functions(func_content, info["path"])
 
-                returns, returns_multiple = parse_returns(returns_func,func_content)
+                if returns_func is None or params_func is None:
+                    continue
+
+                returns, returns_multiple = parse_returns(returns_func, func_content, info["path"])
 
                 incomplete_info = info
 
