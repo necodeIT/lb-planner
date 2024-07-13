@@ -161,8 +161,14 @@ def parse_imports(input_str: str, symbol: str) -> str:
         return fp_l[0]
 
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
-    pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
-    redir_pattern = r"return (\w+)::(\w+)\(\)"
+    # TODO: detect empty returns vs. parsing error
+    # https://regex101.com/r/x8Cgl4/1
+    pattern = r"(?:'(\w+)' => |return )new external_value\((\w+), (['\"])(.+?)\3\)"
+    # https://regex101.com/r/gUtsX3/
+    redir_pattern = r"(\w+)::(\w+)(?<!format)\(\)"
+
+    # Check for the presence of 'external_multiple_structure'
+    is_multiple_structure = "external_multiple_structure" in input_str
 
     matches = re.findall(redir_pattern, input_str)
     if len(matches) > 1:
@@ -179,21 +185,34 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
             new_file_content = f.read()
             matches = re.findall(meth_pattern, new_file_content, re.DOTALL)
             if len(matches) == 0:
-                raise Exception(f"Couldn't find {match[0]}::{match[1]}() inside {fp}")
+                print(WARN, f"Couldn't find {match[0]}::{match[1]}() inside {fp} for {name}")
+                return ({}, False)
             elif len(matches) > 1:
                 raise Exception(f"Found multiple definitions for {match[0]}::{match[1]}() inside {fp}")
             else:
-                return parse_returns(matches[0], new_file_content, fp)
+                result = parse_returns(matches[0], new_file_content, fp)
+
+                # if multiple_structure is detected here, add it
+                if is_multiple_structure:
+                    return (result[0], True)
+                else:
+                    return result
 
     matches = re.findall(pattern, input_str)
 
     output_dict = {}
     for match in matches:
-        key, value_type, description = match
-        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
+        key = match[0]
+        if key is None:
+            if len(matches) > 1:
+                print(WARN, "got empty return key name in a structure larger than 1")
+                print(WARN_TAB, matches)
+            else:
+                key = ''
+        value_type = match[1]
+        description = match[3]
 
-    # Check for the presence of 'external_multiple_structure'
-    is_multiple_structure = "external_multiple_structure" in input_str
+        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
 
     return output_dict, is_multiple_structure
 
@@ -212,7 +231,7 @@ def convert_param_type_to_normal_type(param_type: str) -> str:
 def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
     # https://regex101.com/r/h2W6gZ
-    pattern = r"'(\w+)' => new external_value\s*\(\s*(PARAM_\w+)\s*,\s*'([^']+)',\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
+    pattern = r"['\"](\w+)['\"]\s*=>\s*new external_value\s*\(\s*(PARAM_\w+)\s*,\s*(['\"])(.+?)\3,\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
 
     # Find all matches of the pattern in the input text
     matches = re.findall(pattern, input_text)
@@ -223,10 +242,10 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
         param_name = match[0]
         result[param_name] = ParamInfo(
             convert_param_type_to_normal_type(match[1]),
-            match[2],
-            True if match[3] == "VALUE_REQUIRED" else False,
-            match[4] if match[4] != "null" else None,
-            False if match[5] == "NULL_NOT_ALLOWED" else True,
+            match[3],
+            True if match[4] == "VALUE_REQUIRED" else False,
+            match[5] if match[5] != "null" else None,
+            False if match[6] == "NULL_NOT_ALLOWED" else True,
         )
 
     # TODO: replace $USER->id with something less, uh, "raw"
