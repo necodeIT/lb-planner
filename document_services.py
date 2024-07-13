@@ -69,34 +69,31 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
     clean_content = re.sub(r"//.*|<\?php|defined\(.*\)\s*\|\|\s*die\(\);", "", file_content)
 
     # Splitting the content based on function definition blocks
-    functions = re.findall(r"'(.*?)' => array\((.*?)\),", clean_content, re.DOTALL)
+    # https://regex101.com/r/qyzYks
+    functions = re.findall(r"'(local_lbplanner_(\w+?)_(\w+))' => \[(.*?)\],", clean_content, re.DOTALL)
 
     for function in functions:
         func_dict = {}
 
         # Extracting function name and group
-        func_name_match = re.match(r"local_lbplanner_(.*?)_(.*)", function[0])
-        if func_name_match:
-            func_dict["name"] = function[0]
-            func_dict["group"] = func_name_match.group(1)
-        else:
-            continue
+        func_dict["name"] = function[0]
+        func_dict["group"] = function[1]
 
         # Extracting and adjusting capabilities
-        capabilities = re.search(r"'capabilities' => '.*:(.*?)'", function[1])
+        capabilities = re.search(r"'capabilities' => '.*:(.*?)'", function[3])
         if capabilities is None:
             # check if call needs no capabilities
-            capabilities = re.search(r"'capabilities' => ''", function[1])
+            capabilities = re.search(r"'capabilities' => ''", function[3])
             func_dict["capabilities"] = "" if capabilities else None
         else:
             func_dict["capabilities"] = capabilities.group(1)
 
         # Extracting description
-        description = re.search(r"'description' => '(.*?)'", function[1])
+        description = re.search(r"'description' => '(.*?)'", function[3])
         func_dict["description"] = description.group(1) if description else None
 
         # Extracting and adjusting path
-        classpath = re.search(r"'classpath' => 'local/(.*?)'", function[1])
+        classpath = re.search(r"'classpath' => 'local/(.*?)'", function[3])
         func_dict["path"] = classpath.group(1) if classpath else None
 
         # Only adding to the list if all information is present
@@ -105,6 +102,9 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         else:
             print(WARN, f"Could not gather all info for {func_dict["function_name"]}")
             print(WARN_TAB, func_dict)
+
+    if len(function_info) == 0:
+        print(WARN, "Couldn't find any functions!")
 
     return function_info
 
@@ -162,11 +162,13 @@ def parse_imports(input_str: str, symbol: str) -> str:
 
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
     pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
-    redir_pattern = r"(\w+)::(\w+)\(\)"
+    redir_pattern = r"return (\w+)::(\w+)\(\)"
 
     matches = re.findall(redir_pattern, input_str)
     if len(matches) > 1:
-        raise Exception(f"Couldn't parse return values in {name}")
+        print(WARN, "Couldn't parse return values in", name)
+        print(WARN_TAB, input_str.replace('\n', '\n' + WARN_TAB))
+        return ({}, False)
 
     if len(matches) == 1:
         match = matches[0]
@@ -209,10 +211,12 @@ def convert_param_type_to_normal_type(param_type: str) -> str:
 
 def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
-    pattern = r"'(\w+)' => new external_value\s*\(\s*(\w+)\s*,\s*'([^']+)',\s*(\w+),\s*([\w\d]+|\w+),\s*(\w+)\s*\)"
+    # https://regex101.com/r/h2W6gZ
+    pattern = r"'(\w+)' => new external_value\s*\(\s*(PARAM_\w+)\s*,\s*'([^']+)',\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
 
     # Find all matches of the pattern in the input text
     matches = re.findall(pattern, input_text)
+    # TODO: check whether it's empty or unparseable and emit warning if parse failure
 
     result = {}
     for match in matches:
@@ -224,6 +228,9 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
             match[4] if match[4] != "null" else None,
             False if match[5] == "NULL_NOT_ALLOWED" else True,
         )
+
+    # TODO: replace $USER->id with something less, uh, "raw"
+    # TODO: check if default is either a valid literal or known special variable
 
     return result
 
