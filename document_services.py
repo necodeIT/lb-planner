@@ -112,7 +112,7 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
 def extract_php_functions(php_code: str, name: str) -> tuple[str | None, str | None]:
     # Regular expression to match the function names and bodies
     # https://regex101.com/r/9GtIMA
-    pattern = re.compile(r"(public static function (\w+_(?:returns|parameters))[^\w].*?{.*?})", re.DOTALL)
+    pattern = re.compile(r"(public static function (\w+_(?:returns|parameters))\W[^{}]*?{[^{}]+?})", re.DOTALL)
 
     # Find all matches in the PHP code
     matches: list[tuple[str, str]] = pattern.findall(php_code)
@@ -224,7 +224,7 @@ def parse_phpstring(inpot: str) -> str:
     return "".join(out)
 
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
-    # https://regex101.com/r/x8Cgl4/1
+    # https://regex101.com/r/x8Cgl4/
     pattern = r"(?:'(\w+)'\s*=>\s*|return )new\s*external_value\((\w+),\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*\w+)?\)"
     # https://regex101.com/r/gUtsX3/
     redir_pattern = r"(\w+)::(\w+)(?<!format)\(\)"
@@ -300,7 +300,7 @@ def convert_param_type_to_normal_type(param_type: str) -> str:
 def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
     # https://regex101.com/r/h2W6gZ
-    pattern = r"['\"](\w+)['\"]\s*=>\s*new external_value\s*\(\s*(PARAM_\w+)\s*,\s*(['\"])(.+?)\3,\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
+    pattern = r"['\"](\w+)['\"]\s*=>\s*new external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*),\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
 
     # Find all matches of the pattern in the input text
     matches = re.findall(pattern, input_text)
@@ -311,7 +311,7 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
         param_name = match[0]
         result[param_name] = ParamInfo(
             convert_param_type_to_normal_type(match[1]),
-            match[3],
+            parse_phpstring(match[2]),
             True if match[4] == "VALUE_REQUIRED" else False,
             match[5] if match[5] != "null" else None,
             False if match[6] == "NULL_NOT_ALLOWED" else True,

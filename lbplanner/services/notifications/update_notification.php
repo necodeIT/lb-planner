@@ -19,6 +19,7 @@ namespace local_lbplanner_services;
 use external_api;
 use external_function_parameters;
 use external_value;
+use local_lbplanner\enums\NOTIF_STATUS;
 use local_lbplanner\helpers\notifications_helper;
 
 /**
@@ -38,7 +39,7 @@ class notifications_update_notification extends external_api {
         return new external_function_parameters([
             'status' => new external_value(
                 PARAM_INT,
-                'notification status {0: unread, 1: read}',
+                'notification status ' . NOTIF_STATUS::format(),
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
