@@ -304,7 +304,13 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
 
     # Find all matches of the pattern in the input text
     matches = re.findall(pattern, input_text)
-    # TODO: check whether it's empty or unparseable and emit warning if parse failure
+
+    if len(matches) == 0:
+        nullensure_pattern = r".*return new external_function_parameters(\s*\[\]\s*);.*"
+        if re.match(nullensure_pattern, input_text) is not None:
+            print(WARN, "could not parse params")
+            print(WARN_TAB, input_text.replace('\n', '\n' + WARN_TAB))
+        return {}
 
     result = {}
     for match in matches:
