@@ -3,8 +3,6 @@ import re
 import sys
 from os import path
 
-from typing import Any
-
 WARN = "\033[43m\033[30mWARN:\033[0m "
 WARN_TAB = "    \033[43m \033[0m "
 
