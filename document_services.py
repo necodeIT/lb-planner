@@ -161,11 +161,12 @@ def parse_imports(input_str: str, symbol: str) -> str:
         return fp_l[0]
 
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
-    # TODO: detect empty returns vs. parsing error
     # https://regex101.com/r/x8Cgl4/1
     pattern = r"(?:'(\w+)' => |return )new external_value\((\w+), (['\"])(.+?)\3\)"
     # https://regex101.com/r/gUtsX3/
     redir_pattern = r"(\w+)::(\w+)(?<!format)\(\)"
+    # https://regex101.com/r/rq5q6w/
+    nullensure_pattern = r".*?{\s*return null;?\s*}"
 
     # Check for the presence of 'external_multiple_structure'
     is_multiple_structure = "external_multiple_structure" in input_str
@@ -213,6 +214,11 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
         description = match[3]
 
         output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
+
+    if len(output_dict) == 0:
+        if re.match(nullensure_pattern, input_str) is None:
+            print(WARN, "could not find any returns in non-empty ", name)
+            print(WARN_TAB, input_str.replace('\n', '\n' + WARN_TAB))
 
     return output_dict, is_multiple_structure
 
