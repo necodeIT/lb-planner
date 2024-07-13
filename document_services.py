@@ -160,9 +160,72 @@ def parse_imports(input_str: str, symbol: str) -> str:
     else:
         return fp_l[0]
 
+def parse_phpstuff(inpot: str) -> str:
+    # https://regex101.com/r/p5FzCh
+    casepattern = r"const (\w+) = (\d+|true|false|(['\"]).*?\3)"
+
+    if inpot.endswith('::format()'):
+        enum_name = inpot[:-10]
+        fullbody_pattern = f"class {enum_name} extends Enum {{.*?}}"
+
+        with open(f"lbplanner/classes/enums/{enum_name}.php", "r") as f:
+            matches = re.findall(fullbody_pattern, f.read(), re.DOTALL)
+            if len(matches) == 1:
+                body = matches[0]
+            else:
+                print(WARN, "couldn't parse enum", enum_name)
+                print(WARN_TAB, matches)
+
+        cases = {}
+        matches = re.findall(casepattern, body)
+        for match in matches:
+            # capitalizing first letter, if exists
+            name = "".join([match[0][0].upper(), match[0][1:].lower()])
+            cases[name] = match[1].replace("'", '"')
+
+        return "{ " + ", ".join([f"{name} = {value}" for name, value in cases.items()]) + " }"
+    else:
+        print(WARN, 'unknown phpstuff')
+        return ""
+
+def parse_phpstring(inpot: str) -> str:
+    WHITESPACE = '. \t\n\r' # the . is for string concat in php
+
+    out = []
+    strlit = False
+    quotetype = ''
+    tmp_refarr: list[str] = []
+    for char in inpot:
+        if char in '\'"':
+            if not strlit:
+                strlit = True
+                quotetype = char
+                if len(tmp_refarr) > 0:
+                    out.append(parse_phpstuff("".join(tmp_refarr)))
+                    tmp_refarr = []
+            else:
+                if char == quotetype:
+                    strlit = False
+                else:
+                    out.append(char)
+        else:
+            if strlit:
+                out.append(char)
+            else:
+                if char in WHITESPACE:
+                    continue
+                else:
+                    tmp_refarr.append(char)
+
+    if len(tmp_refarr) > 0:
+        out.append(parse_phpstuff("".join(tmp_refarr)))
+        tmp_refarr = []
+
+    return "".join(out)
+
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
     # https://regex101.com/r/x8Cgl4/1
-    pattern = r"(?:'(\w+)' => |return )new external_value\((\w+), (['\"])(.+?)\3\)"
+    pattern = r"(?:'(\w+)'\s*=>\s*|return )new\s*external_value\((\w+),\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*\w+)?\)"
     # https://regex101.com/r/gUtsX3/
     redir_pattern = r"(\w+)::(\w+)(?<!format)\(\)"
     # https://regex101.com/r/rq5q6w/
@@ -211,7 +274,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
             else:
                 key = ''
         value_type = match[1]
-        description = match[3]
+        description = parse_phpstring(match[2])
 
         output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
 
