@@ -76,7 +76,7 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         func_dict = {}
 
         # Extracting function name and group
-        func_dict["name"] = function[0]
+        func_dict["name"] = function[2]
         func_dict["group"] = function[1]
 
         # Extracting and adjusting capabilities
