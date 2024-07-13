@@ -6,7 +6,39 @@ from os import path
 WARN = "\033[43m\033[30mWARN:\033[0m "
 WARN_TAB = "    \033[43m \033[0m "
 
-def extract_function_info(file_content: str) -> list[dict[str, str | None]]:
+class FunctionInfo:
+    __slots__ = ('name', 'group', 'capabilities', 'description', 'path')
+
+    def __init__(self, name: str, group: str, capabilities: str, description: str, path: str):
+        self.name = name
+        self.group = group
+        self.capabilities = capabilities
+        self.description = description
+        self.path = path
+
+    @property
+    def __dict__(self):
+        return {name: self.__getattribute__(name) for name in self.__slots__}
+
+class FunctionInfoEx(FunctionInfo):
+    __slots__ = ('parameters', 'returns', 'returns_multiple')
+
+    def __init__(self,
+                 parent: FunctionInfo,
+                 parameters: dict[str, dict[str, str | bool | None]],
+                 returns: dict[str, dict[str, str]],
+                 returns_multiple: bool):
+        super().__init__(**parent.__dict__)
+
+        self.parameters = parameters
+        self.returns = returns
+        self.returns_multiple = returns_multiple
+
+    @property
+    def __dict__(self):
+        return {name: self.__getattribute__(name) for name in super().__slots__ + self.__slots__}
+
+def extract_function_info(file_content: str) -> list[FunctionInfo]:
     function_info = []
 
     # Removing comments, PHP tags, and definitions
@@ -21,7 +53,7 @@ def extract_function_info(file_content: str) -> list[dict[str, str | None]]:
         # Extracting function name and group
         func_name_match = re.match(r"local_lbplanner_(.*?)_(.*)", function[0])
         if func_name_match:
-            func_dict["function_name"] = function[0]
+            func_dict["name"] = function[0]
             func_dict["group"] = func_name_match.group(1)
         else:
             continue
@@ -45,7 +77,7 @@ def extract_function_info(file_content: str) -> list[dict[str, str | None]]:
 
         # Only adding to the list if all information is present
         if all(value is not None for value in func_dict.values()):
-            function_info.append(func_dict)
+            function_info.append(FunctionInfo(**func_dict))
         else:
             print(WARN, f"Could not gather all info for {func_dict["function_name"]}")
             print(WARN_TAB, func_dict)
@@ -104,7 +136,7 @@ def parse_imports(input_str: str, symbol: str) -> str:
     else:
         return fp_l[0]
 
-def parse_returns(input_str: str, file_content: str, name: str):
+def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, dict[str, str]], bool]:
     pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
     redir_pattern = r"(\w+)::(\w+)\(\)"
 
@@ -180,29 +212,21 @@ if __name__ == "__main__":
         complete_info = []
 
         for i, info in enumerate(infos):
-            if info["path"] is None:
-                print(WARN, "skipped")
-                continue
-            with open(info["path"], "r") as func_file:
+            with open(info.path, "r") as func_file:
                 func_content = func_file.read()
-                params_func, returns_func = extract_php_functions(func_content, info["path"])
+                params_func, returns_func = extract_php_functions(func_content, info.path)
 
                 if returns_func is None or params_func is None:
                     continue
 
-                returns, returns_multiple = parse_returns(returns_func, func_content, info["path"])
-
-                incomplete_info = info
+                returns, returns_multiple = parse_returns(returns_func, func_content, info.path)
 
                 params = parse_params(params_func)
 
-                incomplete_info["parameters"] = params
-                incomplete_info["returns"] = returns
-                incomplete_info["returns_multiple"] = returns_multiple
+                complete_info.append(FunctionInfoEx(info, params, returns, returns_multiple))
 
-                complete_info.append(incomplete_info)
-
-        declaration = f"const funcs = {json.dumps(complete_info)}"
+        data = json.dumps(complete_info, default=lambda x: x.__dict__)
+        declaration = f"const funcs = {data}"
 
         script: str
         with open(f"{sys.argv[1]}/script.js", "r") as f:
