@@ -6,7 +6,25 @@ from os import path
 WARN = "\033[43m\033[30mWARN:\033[0m "
 WARN_TAB = "    \033[43m \033[0m "
 
-class FunctionInfo:
+class SlotsDict:
+    @property
+    def __dict__(self):
+        print("starting __dict__")
+        slots = tuple()
+
+        for cls in self.__class__.__mro__:
+            if cls != SlotsDict and issubclass(cls, SlotsDict):
+                slots = cls.__slots__ + slots
+        return {name: self.__getattribute__(name) for name in slots}
+
+class ReturnsInfo(SlotsDict):
+    __slots__ = ('type', 'description')
+
+    def __init__(self, type: str, description: str):
+        self.type = type
+        self.description = description
+
+class FunctionInfo(SlotsDict):
     __slots__ = ('name', 'group', 'capabilities', 'description', 'path')
 
     def __init__(self, name: str, group: str, capabilities: str, description: str, path: str):
@@ -16,27 +34,19 @@ class FunctionInfo:
         self.description = description
         self.path = path
 
-    @property
-    def __dict__(self):
-        return {name: self.__getattribute__(name) for name in self.__slots__}
-
 class FunctionInfoEx(FunctionInfo):
     __slots__ = ('parameters', 'returns', 'returns_multiple')
 
     def __init__(self,
                  parent: FunctionInfo,
                  parameters: dict[str, dict[str, str | bool | None]],
-                 returns: dict[str, dict[str, str]],
+                 returns: dict[str, ReturnsInfo],
                  returns_multiple: bool):
         super().__init__(**parent.__dict__)
 
         self.parameters = parameters
         self.returns = returns
         self.returns_multiple = returns_multiple
-
-    @property
-    def __dict__(self):
-        return {name: self.__getattribute__(name) for name in super().__slots__ + self.__slots__}
 
 def extract_function_info(file_content: str) -> list[FunctionInfo]:
     function_info = []
@@ -136,7 +146,7 @@ def parse_imports(input_str: str, symbol: str) -> str:
     else:
         return fp_l[0]
 
-def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, dict[str, str]], bool]:
+def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnsInfo], bool]:
     pattern = r"'(\w+)' => new external_value\((\w+), '([^']+)'"
     redir_pattern = r"(\w+)::(\w+)\(\)"
 
@@ -164,7 +174,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
     output_dict = {}
     for match in matches:
         key, value_type, description = match
-        output_dict[key] = {"type": convert_param_type_to_normal_type(value_type), "description": description}
+        output_dict[key] = ReturnsInfo(convert_param_type_to_normal_type(value_type), description)
 
     # Check for the presence of 'external_multiple_structure'
     is_multiple_structure = "external_multiple_structure" in input_str
@@ -236,6 +246,6 @@ if __name__ == "__main__":
                 if lines[i].startswith('const funcs = '):
                     lines[i] = declaration
             script = "\n".join(lines)
-        
+
         with open(f"{sys.argv[1]}/script.js", "w") as f:
             f.write(script)
