@@ -19,68 +19,71 @@ namespace local_lbplanner_services;
 use external_api;
 use external_function_parameters;
 use external_value;
-use local_lbplanner\helpers\PLAN_ACCESS_TYPE;
+use local_lbplanner\enums\PLAN_ACCESS_TYPE;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
  * Update the access of the plan.
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_update_access extends external_api {
-    public static function update_access_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user to get the data for',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-            'planid' => new external_value(
-                PARAM_INT,
-                'The id of the plan',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
+    /**
+     * Parameters for update_access.
+     * @return external_function_parameters
+     */
+    public static function update_access_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'accesstype' => new external_value(
                 PARAM_INT,
-                'The access type',
+                'New access type '.PLAN_ACCESS_TYPE::format(),
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
             'memberid' => new external_value(
                 PARAM_INT,
-                'The id of the member',
+                'ID of the member to have their access changed',
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
-        ));
+        ]);
     }
 
-    public static function update_access($userid, $planid, $accesstype, $memberid) {
-        global $DB;
+    /**
+     * Update the access of the plan.
+     *
+     * @param int $accesstype new access type
+     * @see PLAN_ACCESS_TYPE
+     * @param int $memberid ID of the member to have their access changed
+     * @return void
+     * @throws \moodle_exception when access denied, type not valid or insufficient permissions
+     */
+    public static function update_access(int $accesstype, int $memberid) {
+        global $DB, $USER;
 
         self::validate_parameters(
             self::update_access_parameters(),
-            array('userid' => $userid, 'planid' => $planid, 'accesstype' => $accesstype, 'memberid' => $memberid)
+            ['accesstype' => $accesstype, 'memberid' => $memberid]
         );
 
-        user_helper::assert_access($userid);
+        $planid = plan_helper::get_plan_id($USER->id);
 
-        if (plan_helper::get_owner($planid) != $userid) {
+        if (plan_helper::get_owner($planid) !== $USER->id) {
             throw new \moodle_exception('Access denied');
         }
 
-        $accesstype_obj = PLAN_ACCESS_TYPE::tryFrom($accesstype);
+        $accesstypeobj = PLAN_ACCESS_TYPE::try_from($accesstype);
 
-        if ($accesstype_obj === null) {
+        if ($accesstypeobj === null) {
             throw new \moodle_exception('Access type not valid');
         }
 
-        if ($userid == $memberid) {
+        if ($USER->id === $memberid) {
             throw new \moodle_exception('Cannot change own permissions');
         }
 
@@ -88,19 +91,21 @@ class plan_update_access extends external_api {
             throw new \moodle_exception('Cannot change permissions for the plan owner');
         }
 
-        if ($accesstype_obj === PLAN_ACCESS_TYPE::OWNER) {
+        if ($accesstypeobj === PLAN_ACCESS_TYPE::OWNER) {
             throw new \moodle_exception('Cannot change permission to owner');
         }
 
-        $access = $DB->get_record(plan_helper::ACCESS_TABLE, array('planid' => $planid, 'userid' => $memberid), '*', MUST_EXIST);
+        $access = $DB->get_record(plan_helper::ACCESS_TABLE, ['planid' => $planid, 'userid' => $memberid], '*', MUST_EXIST);
         $access->accesstype = $accesstype;
 
         $DB->update_record(plan_helper::ACCESS_TABLE, $access);
-
-        return plan_helper::get_plan($planid);
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function update_access_returns() {
-        return plan_helper::plan_structure();
+        return null;
     }
 }

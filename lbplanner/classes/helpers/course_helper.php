@@ -16,160 +16,122 @@
 
 namespace local_lbplanner\helpers;
 
+use context_course;
+use dml_exception;
 use stdClass;
 
+/**
+ * Helper class for courses
+ *
+ * @package    local_lbplanner
+ * @subpackage helpers
+ * @copyright  2024 NecodeIT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class course_helper {
 
-
-
     /**
-     *  Name of the Enrol Table
+     * The course table used by the LP
      */
-    const ENROL_TABLE = 'enrol';
-
-    /**
-     * Name of the User Enroll Table
-     */
-    const USER_ENROL_TABLE = 'user_enrolments';
-
-    /**
-     * Name of the Course Table
-     */
-    const COURSE_TABLE = 'course';
-
-    /**
-     * Name of the Category Table
-     */
-    const CATEGORY_TABLE = 'course_categories';
-
     const LBPLANNER_COURSE_TABLE = 'local_lbplanner_courses';
 
-    const COLORS = array(
-        "#f50057",
-        "#536dfe",
-        "#f9a826",
-        "#00bfa6",
-        "#9b59b6",
-        "#37bbca",
-        "#e67e22",
-        "#37CA48",
-        "#CA3737",
-        "#B5CA37",
-        "#37CA9E",
-        "#3792CA",
-        "#376ECA",
-        "#8B37CA",
-        "#CA37B9",
-    );
-
+    /**
+     * A list of nice colors to choose from :)
+     */
+    const COLORS
+        = [
+            "#f50057",
+            "#536dfe",
+            "#f9a826",
+            "#00bfa6",
+            "#9b59b6",
+            "#37bbca",
+            "#e67e22",
+            "#37CA48",
+            "#CA3737",
+            "#B5CA37",
+            "#37CA9E",
+            "#3792CA",
+            "#376ECA",
+            "#8B37CA",
+            "#CA37B9",
+        ];
+    /**
+     * constant that represents a disabled course
+     */
     const DISABLED_COURSE = 0;
+    /**
+     * constant that represents an enabled course
+     */
     const ENABLED_COURSE = 1;
 
     /**
-     * Get all the courses of the user
-     * @param int userid The id of the user
+     * Get the current school year from the config
+     * Definition of a school year: 2020/2021
+     * Check in config_helper.php for more info how the date is set for defaultactiveyear
      *
-     * @return array of EnrollIds
+     * @return string the current year the last 2 digits (20/20)
+     * @throws dml_exception
      */
-    public static function get_enrollments(int $userid) {
-        global $DB;
-        $enrollments = array();
-        $records = $DB->get_records(self::USER_ENROL_TABLE, array ('userid' => $userid));
-        foreach ($records as $record) {
-            if (in_array($record->enrolid, $enrollments) === false) {
-                $enrollments[] = $record->enrolid;
-            }
-        }
-        return $enrollments;
-    }
-
-    /**
-     * Get the current year
-     *
-     * @return string the current year the last 2 digits (20(20))
-     */
-    public static function get_current_year() : string {
-        if (strpos(get_config('local_lbplanner', 'activeyear'), '/' ) !== false) {
+    public static function get_current_year(): string {
+        if (strpos(get_config('local_lbplanner', 'activeyear'), '/') !== false) {
             return get_config('local_lbplanner', 'activeyear');
         }
         return get_config('local_lbplanner', 'defaultactiveyear');
     }
 
     /**
-     * Get the current category id
-     *
-     * @return int id of the current category
-     */
-    public static function get_current_category() : int {
-        global $DB;
-
-        return $DB->get_record_sql(
-            'SELECT id FROM ' . self::CATEGORY_TABLE . ' WHERE name LIKE "%' . self::get_current_year() . '%"'
-        );
-    }
-    /**
-     * Get course from mdl DB
-     *
-     * @param int $courseid id of the course
-     * @return stdClass course from moodle
-     */
-    public static function get_mdl_course($courseid) : stdClass {
-        global $DB;
-        return $DB->get_record(self::COURSE_TABLE, array('id' => $courseid));
-    }
-    /**
      * Get course from lbpanner DB
      *
      * @param int $courseid id of the course in lbplanner
+     * @param int $userid   id of the user
+     *
      * @return stdClass course from lbplanner
+     * @throws dml_exception
      */
-    public static function get_lbplanner_course($courseid, $userid) : stdClass {
+    public static function get_lbplanner_course(int $courseid, int $userid): stdClass {
         global $DB;
-        return $DB->get_record(self::LBPLANNER_COURSE_TABLE, array('courseid' => $courseid, 'userid' => $userid));
+        return $DB->get_record(self::LBPLANNER_COURSE_TABLE, ['courseid' => $courseid, 'userid' => $userid]);
     }
 
     /**
      * Check if the user is enrolled in the course
      *
      * @param int $courseid course id
-     * @param int $userid user id
+     * @param int $userid   user id
+     *
      * @return bool true if the user is enrolled
      */
-    public static function check_access($courseid, $userid) : bool {
-        global $DB;
-        $enrolmentids = $DB->get_records(self::ENROL_TABLE, array('courseid' => $courseid), '', '*');
-        foreach ($enrolmentids as $enrolmentid) {
-            if ($DB->record_exists(self::USER_ENROL_TABLE, array('enrolid' => $enrolmentid->id, 'userid' => $userid))) {
-                return true;
-            }
-        }
-        return false;
+    public static function check_access(int $courseid, int $userid): bool {
+        $context = context_course::instance($courseid);
+        return is_enrolled($context, $userid, '', true);
     }
+
     /**
      * gets the fullname from a course
      *
      * @param int $courseid the course id
+     *
      * @return string the fullname of the course
+     * @throws dml_exception
      */
-    public static function get_fullname($courseid) {
-        global $DB;
-        return $DB->get_record(self::COURSE_TABLE, array('id' => $courseid), '*', MUST_EXIST)->fullname;
+    public static function get_fullname(int $courseid): string {
+        return get_course($courseid)->fullname;
     }
+
     /**
      * Check if the course is from the current year
      *
      * @param int $courseid the course id
+     *
      * @return bool true if the course is from the current year
+     * @throws dml_exception
      */
-    public static function check_current_year($courseid) {
+    public static function check_current_year(int $courseid): bool {
         if (strpos(self::get_fullname($courseid), self::get_current_year()) !== false) {
             return true;
         } else {
             return false;
         }
-    }
-    public static function get_courseid($enrolmentid) {
-        global $DB;
-        return $DB->get_record(self::ENROL_TABLE, array('id' => $enrolmentid), '*', MUST_EXIST)->courseid;
     }
 }

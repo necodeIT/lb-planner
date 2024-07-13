@@ -18,41 +18,44 @@ namespace local_lbplanner_services;
 
 use external_api;
 use external_function_parameters;
-use external_value;
+use external_single_structure;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
  * Get the plan of the given user.
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_get_plan extends external_api {
-    public static function get_plan_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-        ));
+    /**
+     * Parameters for get_plan.
+     * @return external_function_parameters
+     */
+    public static function get_plan_parameters(): external_function_parameters {
+        return new external_function_parameters([]);
     }
 
-    public static function get_plan($userid) {
-        global $DB;
+    /**
+     * Returns the plan of the current user.
+     *
+     * @return array
+     */
+    public static function get_plan(): array {
+        global $DB, $USER;
 
-        self::validate_parameters(self::get_plan_parameters(), array('userid' => $userid));
-
-        user_helper::assert_access($userid);
-
-        $planid = plan_helper::get_plan_id($userid);
-
-        $plan = $DB->get_record(plan_helper::TABLE, array('id' => $planid));
+        $planid = plan_helper::get_plan_id($USER->id);
 
         return plan_helper::get_plan($planid);
     }
 
-    public static function get_plan_returns() {
+    /**
+     * Returns the structure of the plan.
+     * @return external_single_structure
+     */
+    public static function get_plan_returns(): external_single_structure {
         return plan_helper::plan_structure();
     }
 }

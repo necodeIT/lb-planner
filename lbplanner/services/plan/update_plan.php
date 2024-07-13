@@ -20,71 +20,73 @@ use external_api;
 use external_function_parameters;
 use external_value;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
- * Update the plan of the given user.
+ * Update the plan details.
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_update_plan extends external_api {
-    public static function update_plan_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user to get the data for',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-            'planid' => new external_value(
-                PARAM_INT,
-                'The id of the plan',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
+    /**
+     * Parameters for update_plan.
+     * @return external_function_parameters
+     */
+    public static function update_plan_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'planname' => new external_value(
                 PARAM_TEXT,
-                'The Name of the Plan',
+                'Name of the Plan',
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
             'enableek' => new external_value(
                 PARAM_BOOL,
-                'If the plan is enabled for ek',
+                'Whether EK is enabled for the plan',
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
-        ));
+        ]);
     }
 
-    public static function update_plan($userid, $planid, $planname, $enableek) {
-        global $DB;
+    /**
+     * Update the plan details.
+     *
+     * @param string $planname Name of the Plan
+     * @param bool $enableek Whether EK is enabled for the plan
+     * @return void
+     * @throws Exception when access denied
+     */
+    public static function update_plan(string $planname, bool $enableek) {
+        global $DB, $USER;
 
         self::validate_parameters(
             self::update_plan_parameters(),
-            array('userid' => $userid, 'planid' => $planid, 'planname' => $planname, 'enableek' => $enableek)
+            ['planname' => $planname, 'enableek' => $enableek]
         );
 
-        user_helper::assert_access($userid);
+        $planid = plan_helper::get_plan_id($USER->id);
 
-        if (!plan_helper::check_edit_permissions($planid, $userid)) {
+        if (!plan_helper::check_edit_permissions($planid, $USER->id)) {
             throw new \Exception('Access denied');
         }
 
-        $planid = plan_helper::get_plan_id($userid);
-
-        $plan = $DB->get_record(plan_helper::TABLE, array('id' => $planid), '*', MUST_EXIST);
+        $plan = $DB->get_record(plan_helper::TABLE, ['id' => $planid], '*', MUST_EXIST);
         $plan->name = $planname;
         $plan->enableek = $enableek;
 
         $DB->update_record(plan_helper::TABLE, $plan);
-
-        return plan_helper::get_plan($planid);
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function update_plan_returns() {
-        return plan_helper::plan_structure();
+        return null;
     }
 }

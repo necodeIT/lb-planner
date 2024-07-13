@@ -18,71 +18,69 @@ namespace local_lbplanner_services;
 
 use external_api;
 use external_function_parameters;
-use external_single_structure;
 use external_value;
-use local_lbplanner\helpers\user_helper;
 use local_lbplanner\helpers\notifications_helper;
 
 /**
- * Update the notification status of the given user and id.
+ * Update the notification status.
+ *
+ * @package local_lbplanner
+ * @subpackage services_notifications
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class notifications_update_notification extends external_api {
-    public static function update_notification_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(PARAM_INT, 'User ID', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+    /**
+     * Parameters for update_notification.
+     * @return external_function_parameters
+     */
+    public static function update_notification_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'status' => new external_value(
                 PARAM_INT,
-                'The status of the notification {0: unread, 1: read}',
+                'notification status {0: unread, 1: read}',
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
-            'notificationid' => new external_value(PARAM_INT, 'The ID of the notification', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+            'notificationid' =>
+                new external_value(PARAM_INT, 'ID of the notification to be updated', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+        ]);
     }
 
-    public static function update_notification($userid, $status, $notificationid) {
+    /**
+     * Update the notification status.
+     *
+     * @param int $status notification status
+     * @see notifications_helper
+     * @param int $notificationid ID of the notification to be updated
+     * @return void
+     * @throws \moodle_exception when the notification doesn't exist
+     */
+    public static function update_notification(int $status, int $notificationid) {
         global $DB;
 
         self::validate_parameters(
             self::update_notification_parameters(),
-            array('userid' => $userid, 'status' => $status, 'notificationid' => $notificationid)
+            ['status' => $status, 'notificationid' => $notificationid]
         );
 
-        user_helper::assert_access($userid);
-
-        if (!$DB->record_exists(notifications_helper::TABLE, array('id' => $notificationid))) {
+        if (!$DB->record_exists(notifications_helper::TABLE, ['id' => $notificationid])) {
             throw new \moodle_exception('Notification does not exist');
         }
 
-        $notification = $DB->get_record(notifications_helper::TABLE, array('id' => $notificationid), '*', MUST_EXIST);
+        $notification = $DB->get_record(notifications_helper::TABLE, ['id' => $notificationid], '*', MUST_EXIST);
         $notification->status = $status;
         $notification->timestamp_read = time();
 
         $DB->update_record(notifications_helper::TABLE, $notification);
-
-        return array(
-            'status' => $notification->status,
-            'type' => $notification->type,
-            'info' => $notification->info,
-            'userid' => $notification->userid,
-            'notificationid' => $notification->id,
-            'timestamp' => $notification->timestamp,
-            'timestamp_read' => $notification->timestamp_read,
-        );
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function update_notification_returns() {
-        return new external_single_structure(
-            array(
-                'status' => new external_value(PARAM_INT, 'The status of the notification {0: unread, 1: read}'),
-                'type' => new external_value(PARAM_INT, 'The type of the event that triggered the notification'),
-                'info' => new external_value(PARAM_INT, 'Additional information about the notification'),
-                'userid' => new external_value(PARAM_INT, 'The ID of the user for whom the notification is for'),
-                'notificationid' => new external_value(PARAM_INT, 'The ID of the notification'),
-                'timestamp' => new external_value(PARAM_INT, 'The timestamp of the notification'),
-                'timestamp_read' => new external_value(PARAM_INT, 'The timestamp of the notification'),
-            )
-        );
+        return null;
     }
 }

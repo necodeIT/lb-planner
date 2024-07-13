@@ -18,80 +18,72 @@ namespace local_lbplanner_services;
 
 use external_api;
 use external_function_parameters;
-use external_single_structure;
 use external_multiple_structure;
-use external_value;
-use local_lbplanner\helpers\user_helper;
+use local_lbplanner\helpers\invite_helper;
 use local_lbplanner\helpers\plan_helper;
 
 /**
- * Get all the invites of the given user.
+ * Get all the invites of the current user.
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_get_invites extends external_api {
-    public static function get_invites_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the Owner of the plan',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-        ));
+    /**
+     * Parameters for get_invites.
+     * @return external_function_parameters
+     */
+    public static function get_invites_parameters(): external_function_parameters {
+        return new external_function_parameters([]);
     }
 
-    public static function get_invites($userid) {
-        global $DB;
+    /**
+     * Returns all invites of the current user.
+     *
+     * @return array
+     */
+    public static function get_invites(): array {
+        global $DB, $USER;
 
-        self::validate_parameters(
-            self::get_invites_parameters(),
-            array('userid' => $userid)
-        );
+        $invitesreceived = $DB->get_records(plan_helper::INVITES_TABLE, ['inviteeid' => $USER->id]);
+        $invitessent = $DB->get_records(plan_helper::INVITES_TABLE, ['inviterid' => $USER->id]);
 
-        user_helper::assert_access($userid);
-
-        $invitesreceived = $DB->get_records(plan_helper::INVITES_TABLE, array('inviteeid' => $userid));
-        $invitessent = $DB->get_records(plan_helper::INVITES_TABLE, array('inviterid' => $userid));
-
-        $invites = array();
+        $invites = [];
 
         foreach ($invitesreceived as $invite) {
-            $invites[] = array(
+            $invites[] = [
                 'id' => $invite->id,
                 'inviterid' => $invite->inviterid,
                 'inviteeid' => $invite->inviteeid,
                 'planid' => $invite->planid,
                 'status' => $invite->status,
                 'timestamp' => $invite->timestamp,
-            );
+            ];
         }
 
         foreach ($invitessent as $invitesent) {
-            $invites[] = array(
+            $invites[] = [
                 'id' => $invitesent->id,
                 'inviterid' => $invitesent->inviterid,
                 'inviteeid' => $invitesent->inviteeid,
                 'planid' => $invitesent->planid,
                 'status' => $invitesent->status,
                 'timestamp' => $invitesent->timestamp,
-            );
+            ];
         }
 
         return $invites;
     }
 
-    public static function get_invites_returns() {
+    /**
+     * Returns the structure of the array of invites.
+     * @return external_multiple_structure
+     */
+    public static function get_invites_returns(): external_multiple_structure {
         return new external_multiple_structure(
-            new external_single_structure(
-                array(
-                    'id' => new external_value(PARAM_INT, 'The id of the invite'),
-                    'inviterid' => new external_value(PARAM_INT, 'The id of the owner user'),
-                    'inviteeid' => new external_value(PARAM_INT, 'The id of the invited user'),
-                    'planid' => new external_value(PARAM_INT, 'The id of the plan'),
-                    'status' => new external_value(PARAM_INT, 'The Status of the invitation'),
-                    'timestamp' => new external_value(PARAM_INT, 'The time when the invitation was send'),
-                )
-            )
+            invite_helper::structure()
         );
     }
 }

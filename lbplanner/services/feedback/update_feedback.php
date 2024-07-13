@@ -20,52 +20,71 @@ use external_api;
 use external_function_parameters;
 use external_value;
 use gradereport_singleview\local\ui\feedback;
-use local_lbplanner\helpers\user_helper;
 use local_lbplanner\helpers\feedback_helper;
 
 /**
  * Updates feedback from the database.
+ *
+ * @package local_lbplanner
+ * @subpackage services_feedback
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class feedback_update_feedback extends external_api {
-    public static function update_feedback_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'feedbackid' => new external_value(PARAM_INT, 'The id of the course', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'notes' => new external_value(PARAM_TEXT, 'The notes of the feedback', VALUE_DEFAULT, null, NULL_ALLOWED),
-            'status' => new external_value(PARAM_INT, 'The status of the feedback', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+    /**
+     * Parameters for update_feedback.
+     * @return external_function_parameters
+     */
+    public static function update_feedback_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'feedbackid' =>
+                new external_value(PARAM_INT, 'ID of the feedback to be updated', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+            'notes' => new external_value(PARAM_TEXT, 'updated notes', VALUE_DEFAULT, null, NULL_ALLOWED),
+            'status' => new external_value(PARAM_INT, 'updated status', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+        ]);
     }
 
-    public static function update_feedback($userid, $feedbackid, $notes, $status) {
-        global $DB;
+    /**
+     * Updates feedback from the database.
+     *
+     * @param int $feedbackid ID of the feedback to be updated
+     * @param string $notes updated notes
+     * @param int $status updated status
+     * @see feedback_helper
+     * @return void
+     * @throws \moodle_exception when feedback not found or status invalid
+     */
+    public static function update_feedback(int $feedbackid, string $notes, int $status) {
+        global $DB, $USER;
 
         self::validate_parameters(
             self::update_feedback_parameters(),
-            array('userid' => $userid , 'feedbackid' => $feedbackid, 'notes' => $notes, 'status' => $status)
+            ['feedbackid' => $feedbackid, 'notes' => $notes, 'status' => $status]
         );
 
-        user_helper::assert_access($userid);
         feedback_helper::assert_admin_access();
 
-        if (!$DB->record_exists(feedback_helper::LBPLANNER_FEEDBACK_TABLE, array('id' => $feedbackid))) {
+        if (!$DB->record_exists(feedback_helper::LBPLANNER_FEEDBACK_TABLE, ['id' => $feedbackid])) {
             throw new \moodle_exception('feedback_not_found');
         }
 
-        $feedback = $DB->get_record(feedback_helper::LBPLANNER_FEEDBACK_TABLE, array('id' => $feedbackid), '*', MUST_EXIST);
+        $feedback = $DB->get_record(feedback_helper::LBPLANNER_FEEDBACK_TABLE, ['id' => $feedbackid], '*', MUST_EXIST);
         $feedback->notes = $notes;
-        if ($status > 1 || $status < 0) {
+        if ($status > 1 || $status < 0) { // TODO: use enum to validate.
             throw new \moodle_exception('Invalid status');
         }
         $feedback->status = $status;
         $feedback->lastmodified = time();
-        $feedback->lastmodifiedby = $userid;
+        $feedback->lastmodifiedby = $USER->id;
 
         $DB->update_record(feedback_helper::LBPLANNER_FEEDBACK_TABLE, $feedback);
-
-        return $feedback;
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function update_feedback_returns() {
-        return feedback_helper::structure();
+        return null;
     }
 }

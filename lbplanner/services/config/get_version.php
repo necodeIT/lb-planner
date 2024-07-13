@@ -23,25 +23,43 @@ use external_value;
 
 /**
  * Get version service.
+ *
+ * @package local_lbplanner
+ * @subpackage services_config
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class config_get_version extends external_api {
-    public static function get_version_parameters() {
+    /**
+     * Parameters for get_version.
+     * @return external_function_parameters
+     */
+    public static function get_version_parameters(): external_function_parameters {
         return new external_function_parameters(
-            array()
+            []
         );
     }
 
-    public static function get_version() {
-        $release = get_config('local_lbplanner', 'release');
-        return array(
-            'release' => get_config('local_lbplanner', 'release'));
+    /**
+     * Returns the version.
+     *
+     * @return array containing the version
+     */
+    public static function get_version(): array {
+        return [
+            'release' => get_config('local_lbplanner', 'release'),
+        ];
     }
 
-    public static function get_version_returns() {
+    /**
+     * Returns the structure of the versioning array.
+     * @return external_single_structure
+     */
+    public static function get_version_returns(): external_single_structure {
         return new external_single_structure(
-            array(
+            [
                 'release' => new external_value(PARAM_TEXT, 'the current LBPlanner version'),
-            )
+            ]
         );
     }
 }

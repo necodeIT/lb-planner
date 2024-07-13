@@ -20,34 +20,50 @@ use external_api;
 use external_function_parameters;
 use external_value;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
- * Remove a user from the plan.
+ * Remove a user from your plan
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_remove_user extends external_api {
-    public static function remove_user_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'removeuserid' => new external_value(PARAM_INT, 'The id of the user to remove', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'planid' => new external_value(PARAM_INT, 'The id of the plan', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+    /**
+     * Parameters for remove_user.
+     * @return external_function_parameters
+     */
+    public static function remove_user_parameters(): external_function_parameters {
+        return new external_function_parameters([
+            'userid' => new external_value(PARAM_INT, 'ID of the user to remove', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+        ]);
     }
 
-    public static function remove_user($userid, $removeuserid, $planid) {
-        global $DB;
+    /**
+     * Remove a user from your plan
+     *
+     * @param int $userid ID of the user to remove
+     * @return void
+     */
+    public static function remove_user(int $userid) {
+        global $DB, $USER;
 
         self::validate_parameters(
             self::remove_user_parameters(),
-            array('userid' => $userid, 'removeuserid' => $removeuserid, 'planid' => $planid)
+            ['userid' => $userid]
         );
 
-        user_helper::assert_access($userid);
+        $planid = plan_helper::get_plan_id($USER->id);
 
-        return plan_helper::remove_user($planid, $userid, $removeuserid);
+        plan_helper::remove_user($planid, $USER->id, $userid);
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function remove_user_returns() {
-        return plan_helper::plan_structure();
+        return null;
     }
 }

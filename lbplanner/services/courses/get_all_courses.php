@@ -23,97 +23,94 @@ use external_function_parameters;
 use external_multiple_structure;
 use external_single_structure;
 use external_value;
-use invalid_parameter_exception;
-use local_lbplanner\helpers\user_helper;
 use local_lbplanner\helpers\course_helper;
 use moodle_exception;
 
 /**
  * Get all the courses of the current year.
+ *
+ * @package local_lbplanner
+ * @subpackage services_courses
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class courses_get_all_courses extends external_api {
+
+    /**
+     * Has no Parameters
+     * @return external_function_parameters
+     */
     public static function get_all_courses_parameters(): external_function_parameters {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user to get the courses for',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-        ));
+        return new external_function_parameters([]);
     }
 
     /**
+     * Get all the courses of the current year.
      * @throws coding_exception
      * @throws dml_exception
      * @throws moodle_exception
-     * @throws invalid_parameter_exception
      */
-    public static function get_all_courses($userid): array {
-        global $DB;
+    public static function get_all_courses(): array {
+        global $DB, $USER;
 
-        self::validate_parameters(self::get_all_courses_parameters(), array('userid' => $userid));
-
-        user_helper::assert_access($userid);
+        $userid = $USER->id;
 
         $courses = enrol_get_my_courses();
         // Remove Duplicates.
         $courses = array_unique($courses, SORT_REGULAR);
-
         // Check this out: https://www.youtube.com/watch?v=z3Pzfi476HI .
-        $catgirls = array();
+        $catgirls = [];
 
         foreach ($courses as $course) {
             $courseid = $course->id;
             $name = $course->fullname;
-            $shortname = substr($course->shortname, 0, 5);
-
+            $shortname = $course->shortname;
+            // Check if the shortname contains a space.
             if (strpos($shortname, ' ') !== false) {
                     $shortname = substr($shortname, 0, strpos($shortname, ' '));
             }
-
-            if (!course_helper::check_current_year($courseid)) {
-                continue;
+            if (strlen($shortname) >= 5) {
+                    $shortname = substr($shortname, 0, 5);
             }
-            if ($DB->record_exists(
-                course_helper::LBPLANNER_COURSE_TABLE, array('courseid' => $courseid, 'userid' => $userid)
-                )) {
-                $fetchedcourse = $DB->get_record(
-                    course_helper::LBPLANNER_COURSE_TABLE, array('courseid' => $courseid, 'userid' => $userid),
-                    '*',
-                    MUST_EXIST
-                );
-                $fetchedcourse->name = $name;
-                $catgirls[] = (object) $fetchedcourse;
+            // Check if the course is from the current year.
+            if (course_helper::check_current_year($courseid)) {
+                    continue;
+            }
+            // Check if the course is already in the LB Planner database.
+            if ($DB->record_exists(course_helper::LBPLANNER_COURSE_TABLE, ['courseid' => $courseid, 'userid' => $userid])) {
+                $fetchedcourse = course_helper::get_lbplanner_course($courseid, $userid);
             } else {
-                $catgirl = (object) array(
-                 'courseid' => $courseid,
-                 'color' => course_helper::COLORS[array_rand(course_helper::COLORS)],
-                 'shortname' => strtoupper($shortname),
-                 'enabled' => course_helper::DISABLED_COURSE,
-                 'userid' => $userid,
-                 );
-                 $DB->insert_record(course_helper::LBPLANNER_COURSE_TABLE, $catgirl);
-                 $catgirl->name = $name;
-                 $catgirls[] = $catgirl;
+                // IF not create an Object to be put into the LB Planner database.
+                $fetchedcourse = (object) [
+                    'courseid' => $courseid,
+                    'color' => course_helper::COLORS[array_rand(course_helper::COLORS)],
+                    'shortname' => strtoupper($shortname),
+                    'enabled' => course_helper::DISABLED_COURSE,
+                    'userid' => $userid,
+                ];
+                $DB->insert_record(course_helper::LBPLANNER_COURSE_TABLE, $fetchedcourse);
             }
-
+            // Add name to fetched Course.
+            $fetchedcourse->name = $name;
+            $catgirls[] = $fetchedcourse;
         }
             return $catgirls;
     }
 
+    /**
+     * Returns description of method result value
+     * @return external_multiple_structure description of method result value
+     */
     public static function get_all_courses_returns(): external_multiple_structure {
         return new external_multiple_structure(
         new external_single_structure(
-            array(
+            [
                 'courseid' => new external_value(PARAM_INT, 'The id of the course'),
-                'color' => new external_value(PARAM_TEXT, 'The color of the course'),
+                'color' => new external_value(PARAM_TEXT, 'The color of the course in HEX'),
                 'name' => new external_value(PARAM_TEXT, 'The name of the course'),
                 'shortname' => new external_value(PARAM_TEXT, 'The shortname of the course'),
-            'enabled' => new external_value(PARAM_BOOL, 'Whether the course is enabled or not'),
-            'userid' => new external_value(PARAM_INT, 'The id of the user'),
-        )
+                'enabled' => new external_value(PARAM_BOOL, 'Whether the course is enabled or not'),
+            ]
         )
         );
     }

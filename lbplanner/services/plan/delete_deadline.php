@@ -20,68 +20,69 @@ use external_api;
 use external_function_parameters;
 use external_value;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
- * Delete a deadline from the plan.
+ * Delete a deadline from your plan
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_delete_deadline extends external_api {
-    public static function delete_deadline_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user to get the data for',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-            'planid' => new external_value(
-                PARAM_INT,
-                'The ID of the Plan',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
+    /**
+     * Parameters for delete_deadline.
+     * @return external_function_parameters
+     */
+    public static function delete_deadline_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'moduleid' => new external_value(
                 PARAM_INT,
-                'The ID of the Module',
+                'ID of the Module',
                 VALUE_REQUIRED,
                 null,
                 NULL_NOT_ALLOWED
             ),
-        ));
+        ]);
     }
 
-    public static function delete_deadline($userid, $planid, $moduleid) {
-        global $DB;
+    /**
+     * Delete a deadline.
+     *
+     * @param int $moduleid ID of the Module
+     * @return void
+     * @throws Exception when access denied
+     */
+    public static function delete_deadline(int $moduleid) {
+        global $DB, $USER;
 
         self::validate_parameters(
             self::delete_deadline_parameters(),
-            array(
-                'userid' => $userid,
-                'planid' => $planid,
+            [
                 'moduleid' => $moduleid,
-            )
+            ]
         );
 
-        user_helper::assert_access($userid);
+        $planid = plan_helper::get_plan_id($USER->id);
 
-        if (!plan_helper::check_edit_permissions($planid, $userid)) {
+        if (!plan_helper::check_edit_permissions($planid, $USER->id)) {
             throw new \Exception('Access denied');
         }
 
         $DB->delete_records(
             plan_helper::DEADLINES_TABLE,
-            array(
-                'planid' => $planid ,
-                'moduleid' => $moduleid
-            )
+            [
+                'planid' => $planid,
+                'moduleid' => $moduleid,
+            ]
         );
-
-        return plan_helper::get_plan($planid);
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function delete_deadline_returns() {
-        return plan_helper::plan_structure();
+        return null;
     }
 }

@@ -16,77 +16,90 @@
 
 namespace local_lbplanner_services;
 
+use dml_exception;
 use external_api;
 use external_function_parameters;
-use external_single_structure;
 use external_value;
-use local_lbplanner\helpers\user_helper;
+use invalid_parameter_exception;
 use local_lbplanner\helpers\course_helper;
+use moodle_exception;
 
 /**
  * Update the data for a course.
+ *
+ * @package local_lbplanner
+ * @subpackage services_courses
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class courses_update_course extends external_api {
-    public static function update_course_parameters() {
-        return new external_function_parameters(array(
+    /**
+     * Parameters for update_course.
+     * @return external_function_parameters
+     */
+    public static function update_course_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'courseid' => new external_value(PARAM_INT, 'The id of the course', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'color' => new external_value(PARAM_TEXT, 'The color of the course', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'shortname' => new external_value(PARAM_TEXT, 'The shortname of the course', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
+            'color' => new external_value(PARAM_TEXT, 'The color of the course in HEX', VALUE_DEFAULT, null),
+            'shortname' => new external_value(PARAM_TEXT, 'The shortname of the course', VALUE_DEFAULT, null),
             'enabled' => new external_value(
                 PARAM_BOOL,
                 'Whether the course is enabled or not',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
+                VALUE_DEFAULT,
+                null
             ),
-            'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+        ]);
     }
 
-    public static function update_course($courseid, $color, $shortname, $enabled, $userid) {
-        global $DB;
+    /**
+     * Update the User-data for a course.
+     * @param int $courseid The id of the course
+     * @param string $color The color of the course
+     * @param string $shortname The shortname of the course
+     * @param bool $enabled Whether the course is enabled or not
+     * @return void
+     * @throws dml_exception
+     * @throws invalid_parameter_exception
+     * @throws moodle_exception
+     */
+    public static function update_course($courseid, $color, $shortname, $enabled): void {
+        global $DB , $USER;
 
         self::validate_parameters(
             self::update_course_parameters(),
-            array(
+            [
                 'courseid' => $courseid,
                 'color' => $color,
                 'shortname' => $shortname,
                 'enabled' => $enabled,
-                'userid' => $userid
-            )
+            ]
         );
-
-        user_helper::assert_access($userid);
-
-        if (!course_helper::check_access($courseid, $userid)) {
-            throw new \moodle_exception('Access denied');
-        }
-        $course = course_helper::get_lbplanner_course($courseid, $userid);
 
         if (strlen($shortname) > 5) {
-            throw new \moodle_exception('Shortname is too long');
+            throw new moodle_exception('Shortname is too long');
         }
 
-        $course->color = $color;
-        $course->shortname = $shortname;
-        $course->enabled = $enabled;
-        $DB->update_record(course_helper::LBPLANNER_COURSE_TABLE, $course);
-        $course->name = course_helper::get_fullname($course->courseid);
+        $course = course_helper::get_lbplanner_course($courseid, $USER->id);
 
-        return $course;
+        if ($color !== null) {
+            $course->color = $color;
+        }
+        if ($shortname !== null) {
+            $course->shortname = $shortname;
+        }
+        if ($enabled !== null) {
+            $course->enabled = $enabled;
+        }
+
+        $DB->update_record(course_helper::LBPLANNER_COURSE_TABLE, $course);
+
     }
 
+    /**
+     * Returns nothing.
+     * @return null
+     */
     public static function update_course_returns() {
-        return new external_single_structure(
-            array(
-                'courseid' => new external_value(PARAM_INT, 'The id of the course'),
-                'color' => new external_value(PARAM_TEXT, 'The color of the course'),
-                'name' => new external_value(PARAM_TEXT, 'The name of the course'),
-                'shortname' => new external_value(PARAM_TEXT, 'The shortname of the course'),
-                'enabled' => new external_value(PARAM_BOOL, 'Whether the course is enabled or not'),
-                'userid' => new external_value(PARAM_INT, 'The id of the user'),
-            )
-        );
+        return null;
     }
 }

@@ -16,15 +16,21 @@
 
 namespace local_lbplanner\helpers;
 
+use coding_exception;
 use context_system;
-use moodle1_converter;
-use moodle_database;
-use moodle_url;
-use moodleform;
+use dml_exception;
+use moodle_exception;
 use stdClass;
+use user_picture;
+use core_user;
 
 /**
  * Provides helper methods for user related stuff.
+ *
+ * @package    local_lbplanner
+ * @subpackage helpers
+ * @copyright  2024 NecodeIT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class user_helper {
 
@@ -51,69 +57,29 @@ class user_helper {
     /**
      * Maps CAPABILITY shortnames to their corresponding enum value.
      */
-    const CAPABILITY_ENUMS = [
-        self::CAPABILITY_ADMIN => 1,
-        self::CAPABILITY_MANAGER => 2,
-        self::CAPABILITY_TEACHER => 4,
-        self::CAPABILITY_STUDENT => 8
-    ];
+    const CAPABILITY_ENUMS
+        = [
+            self::CAPABILITY_ADMIN => 1,
+            self::CAPABILITY_MANAGER => 2,
+            self::CAPABILITY_TEACHER => 4,
+            self::CAPABILITY_STUDENT => 8,
+        ];
 
     /**
      * Name of the user database
      */
-    const TABLE = 'local_lbplanner_users';
+    const LB_PLANNER_USER_TABLE = 'local_lbplanner_users';
 
     /**
-     * The table where moodle stores the user data.
-     */
-    const MOODLE_TABLE = 'user';
-
-    /**
-     * The table where moodle stores the user context data.
-     */
-    const MOODLE_CONTEXT_TABLE = 'context';
-
-    /**
-     * @deprecated Use user_helper::assert_access() instead
      * Checks if the current user has access to the given user id.
      *
      * @param int $userid The id of the user to check access for.
+     *
      * @return bool True if the current user has access to the given user id, false otherwise.
      */
-    public static function check_access(int $userid):bool {
+    public static function check_access(int $userid): bool {
         global $USER;
         return $USER->id == $userid;
-    }
-
-    /**
-     * Retrieves the user with the given id.
-     * ```php
-     * $mdluser->username // The username of the user.
-     * $mdluser->firstname // The firstname of the user.
-     * $mdluser->lastname // The lastname of the user.
-     * $mdluser->profileimageurl // The profile image url of the user.
-     * ```
-     *
-     * @param integer $userid The id of the user to retrieve.
-     * @return stdClass The user with the given id.
-     */
-    public static function get_mdl_user_info(int $userid):stdClass {
-        global $DB;
-        $user = $DB->get_record(self::MOODLE_TABLE, array('id' => $userid), '*', MUST_EXIST);
-        $contextid = $DB->get_record(
-            self::MOODLE_CONTEXT_TABLE,
-            array('depth' => 2, 'contextlevel' => 30, 'instanceid' => $userid),
-            '*',
-            IGNORE_MISSING
-        );
-        $mdluser = new stdClass();
-        $mdluser->username = $user->username;
-        $mdluser->firstname = $user->firstname;
-        $mdluser->lastname = $user->lastname;
-        $mdluser->profileimageurl = strval(moodle_url::make_pluginfile_url($contextid->id, 'user', 'icon', null, '/boost_union/', 'f1.png'));
-        $mdluser->vintage = $user->address;
-
-        return $mdluser;
     }
 
     /**
@@ -121,13 +87,29 @@ class user_helper {
      * Throws an exception if the current user does not have access.
      *
      * @param int $userid The id of the user to check access for.
+     *
      * @return void
+     * @throws moodle_exception
      */
-    public static function assert_access(int $userid) {
+    public static function assert_access(int $userid): void {
         global $USER;
         if ($USER->id != $userid) {
-            throw new \moodle_exception('Access denied');
+            throw new moodle_exception('Access denied');
         }
+    }
+
+    /**
+     * Checks if the given user is an admin.
+     *
+     * @param int $userid The id of the user to check.
+     *
+     * @return bool True if the given user is an admin, false otherwise.
+     * @throws coding_exception
+     * @throws dml_exception
+     */
+    public static function is_admin(int $userid): bool {
+        $context = context_system::instance();
+        return has_capability(self::CAPABILITY_ADMIN, $context, $userid, false);
     }
 
     /**
@@ -151,10 +133,12 @@ class user_helper {
      *
      *
      * @param int $userid The id of the user to check access for.
+     *
      * @return int The capabilities of the given user.
+     * @throws coding_exception
+     * @throws dml_exception
      */
-    public static function get_user_capability_bitmask(int $userid) : int {
-        global $DB;
+    public static function get_user_capability_bitmask(int $userid): int {
         $capabilities = 0;
         $context = context_system::instance();
         if (has_capability(self::CAPABILITY_ADMIN, $context, $userid, false)) {
@@ -171,15 +155,18 @@ class user_helper {
         }
         return $capabilities;
     }
+
     /**
-     * Checks if the given user exists in the database.
+     * Checks if the given user exists in the LB_PLANNER_USER database.
      *
-     * @param integer $userid The id of the user to check.
-     * @return boolean True if the user exists, false otherwise.
+     * @param int $userid The id of the user to check.
+     *
+     * @return bool True if the user exists, false otherwise.
+     * @throws dml_exception
      */
     public static function check_user_exists(int $userid): bool {
         global $DB;
-        return $DB->record_exists(self::TABLE, array('userid' => $userid));
+        return $DB->record_exists(self::LB_PLANNER_USER_TABLE, ['userid' => $userid]);
     }
 
     /**
@@ -192,24 +179,42 @@ class user_helper {
      * $user->language // The language the user has set for the app.
      * ```
      *
-     * @param integer $userid The id of the user to retrieve.
+     * @param int $userid The id of the user to retrieve.
+     *
      * @return stdClass The user with the given id.
+     * @throws dml_exception
      */
     public static function get_user(int $userid): stdClass {
         global $DB;
-        return $DB->get_record(self::TABLE, array('userid' => $userid), '*', MUST_EXIST);
+        return $DB->get_record(self::LB_PLANNER_USER_TABLE, ['userid' => $userid], '*', MUST_EXIST);
     }
 
     /**
      * Retrieves the full name of the user with the given id.
      *
-     * @param integer $userid The id of the user to retrieve the full name for.
      * @return string The full name of the user with the given id.
+     * @deprecated not in use
      */
-    public static function get_complete_name(int $userid): string {
-        $user = self::get_mdl_user_info($userid);
+    public static function get_complete_name(): string {
+        global $USER;
+        return $USER->firstname . ' ' . $USER->lastname;
+    }
 
-        return $user->firstname . ' ' . $user->lastname;
+    /**
+     * This Function is used to get the user picture of a user.
+     *
+     * @param int $userid The id of the user to retrieve the picture for.
+     *
+     * @return string The url of the user picture.
+     * @throws dml_exception
+     * @throws coding_exception
+     */
+    public static function get_mdl_user_picture(int $userid): string {
+        global $PAGE;
+        $mdluser = core_user::get_user($userid, '*', MUST_EXIST);
+        $userpicture = new user_picture($mdluser);
+        $userpicture->size = 1; // Size f1.
+        return $userpicture->get_url($PAGE)->out(false);
     }
 
 }

@@ -19,36 +19,40 @@ namespace local_lbplanner_services;
 use external_api;
 use external_function_parameters;
 use external_multiple_structure;
-use external_value;
-use local_lbplanner\helpers\user_helper;
 use local_lbplanner\helpers\feedback_helper;
 
 /**
  * Get all feedback from the database.
+ *
+ * @package local_lbplanner
+ * @subpackage services_feedback
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class feedback_get_all_feedbacks extends external_api {
-    public static function get_all_feedbacks_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+    /**
+     * Parameters for get_all_feedbacks.
+     * @return external_function_parameters
+     */
+    public static function get_all_feedbacks_parameters(): external_function_parameters {
+        return new external_function_parameters([]);
     }
 
-    public static function get_all_feedbacks($userid) {
-        global $DB;
-
-        self::validate_parameters(
-            self::get_all_feedbacks_parameters(),
-            array('userid' => $userid)
-        );
-
-        user_helper::assert_access($userid);
-
+    /**
+     * Returns all feedbacks from the database.
+     *
+     * @return array all feedback objects
+     */
+    public static function get_all_feedbacks(): array {
         feedback_helper::assert_admin_access();
-
-        return feedback_helper::get_all_feedbacks($userid);
+        return feedback_helper::get_all_feedbacks();
     }
 
-    public static function get_all_feedbacks_returns() {
+    /**
+     * Returns the structure of the array of feedbacks.
+     * @return external_multiple_structure
+     */
+    public static function get_all_feedbacks_returns(): external_multiple_structure {
         return new external_multiple_structure(
             feedback_helper::structure(),
         );

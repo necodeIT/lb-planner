@@ -13,78 +13,69 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+/**
+ * Provides helper classes for notification related stuff
+ *
+ * @package    local_lbplanner
+ * @subpackage helpers
+ * @copyright  2024 NecodeIT
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 
 namespace local_lbplanner\helpers;
 
+use external_single_structure;
+use external_value;
+use local_lbplanner\enums\{NOTIF_STATUS, NOTIF_TRIGGER};
+
 /**
- * Provides helper methods for notification related stuff.
+ * Provides helper methods for notification related stuff
  */
 class notifications_helper {
     /**
      * Name of the notifications table.
      */
-    const TABLE = 'local_lbplanner_notification';
+    const LBPLANNER_NOTIFICATION_TABLE = 'local_lbplanner_notification';
 
     /**
-     * Enum value for a read notification.
+     * Returns the data structure of a notification
+     *
+     * @return external_single_structure The data structure of a notification.
      */
-    const STATUS_READ = 1;
-
-    /**
-     * Enum value for a unread notification.
-     */
-    const STATUS_UNREAD = 0;
-
-    /**
-     * Enum value for a notification triggered by an invitation.
-     */
-    const TRIGGER_INVITE = 0;
-
-    /**
-     * Enum value for a notification triggered by an acceptation of an invitation.
-     */
-    const TRIGGER_INVITE_ACCEPTED = 1;
-
-    /**
-     * Enum value for a notification triggered by a rejection of an invitation.
-     */
-    const TRIGGER_INVITE_DECLINED = 2;
-
-    /**
-     * Enum value for a notification triggered by a user leaving a plan.
-     */
-    const TRIGGER_PLAN_LEFT = 3;
-
-    /**
-     * Enum value for a notification triggered by a user being removed from a plan.
-     */
-    const TRIGGER_PLAN_REMOVED = 4;
-
-    /**
-     * Enum value for a notification triggered by a new user.
-     */
-    const TRIGGER_USER_REGISTERED = 5;
+    public static function structure(): external_single_structure {
+        return new external_single_structure([
+            'status' => new external_value(PARAM_INT, 'The status of the notification ' . NOTIF_STATUS::format()),
+            'type' =>
+                new external_value(PARAM_INT, 'The type of the event that triggered the notification ' . NOTIF_TRIGGER::format()),
+            'info' => new external_value(PARAM_INT, 'Additional information about the notification'),
+            'userid' => new external_value(PARAM_INT, 'The ID of the user for whom the notification is for'),
+            'notificationid' => new external_value(PARAM_INT, 'The ID of the notification', NULL_NOT_ALLOWED),
+            'timestamp' => new external_value(PARAM_INT, 'The timestamp of the notification'),
+            'timestamp_read' => new external_value(PARAM_INT, 'The timestamp of the notification when it was read'),
+        ]);
+    }
 
     /**
      * Notifies the given user about the given event, with the given info.
      *
-     * @param integer $userid The user to notify.
-     * @param integer $info Additional information as stringified json.
-     * @param integer $type The type of notification.
+     * @param int $userid The user to notify.
+     * @param int $info   Additional information as stringified json.
+     * @param int $type   The type of notification.
+     *
      * @return integer The id of the notification.
      */
-    public static function notify_user( int $userid, int $info, int $type ): int {
+    public static function notify_user(int $userid, int $info, int $type): int {
         global $DB;
 
         $notification = new \stdClass();
         $notification->userid = $userid;
         $notification->info = $info;
         $notification->type = $type;
-        $notification->status = self::STATUS_UNREAD;
+        $notification->status = NOTIF_STATUS::UNREAD;
         $notification->timestamp = time();
         $notification->timestamp_read = null;
 
-        $id = $DB->insert_record(self::TABLE, $notification);
+        $id = $DB->insert_record(self::LBPLANNER_NOTIFICATION_TABLE, $notification);
 
         return $id;
     }

@@ -28,24 +28,39 @@ use local_lbplanner\helpers\plan_helper;
 
 /**
  * Get all the modules of the current year.
+ *
+ * @package local_lbplanner
+ * @subpackage services_modules
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class modules_get_all_modules extends external_api {
-    public static function get_all_modules_parameters() {
-        return new external_function_parameters(array(
+    /**
+     * Parameters for get_all_modules.
+     * @return external_function_parameters
+     */
+    public static function get_all_modules_parameters(): external_function_parameters {
+        return new external_function_parameters([
             'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-        ));
+        ]);
     }
 
-    public static function get_all_modules($userid) {
+    /**
+     * Returns all the modules for a user.
+     *
+     * @param int $userid The ID of the user
+     * @return array the modules
+     */
+    public static function get_all_modules(int $userid): array {
         global $DB;
 
-        self::validate_parameters(self::get_all_modules_parameters(), array('userid' => $userid));
+        self::validate_parameters(self::get_all_modules_parameters(), ['userid' => $userid]);
 
         user_helper::assert_access($userid);
 
-        $modules = array();
+        $modules = [];
 
-        $courses = self::call_external_function('local_lbplanner_courses_get_all_courses', array('userid' => $userid));
+        $courses = self::call_external_function('local_lbplanner_courses_get_all_courses', ['userid' => $userid]);
         $plan = plan_helper::get_plan(plan_helper::get_plan_id($userid));
         $ekenabled = $plan["enableek"];
 
@@ -61,9 +76,13 @@ class modules_get_all_modules extends external_api {
         return $modules;
     }
 
-    public static function get_all_modules_returns() {
+    /**
+     * Returns the structure of the module array.
+     * @return external_multiple_structure
+     */
+    public static function get_all_modules_returns(): external_multiple_structure {
         return new external_multiple_structure(
-        modules_helper::structure(),
+            modules_helper::structure(),
         );
     }
 }

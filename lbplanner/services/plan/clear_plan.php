@@ -18,52 +18,48 @@ namespace local_lbplanner_services;
 
 use external_api;
 use external_function_parameters;
-use external_value;
 use local_lbplanner\helpers\plan_helper;
-use local_lbplanner\helpers\user_helper;
 
 /**
  * Clear the plan for the given user.
+ *
+ * @package local_lbplanner
+ * @subpackage services_plan
+ * @copyright 2024 necodeIT
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class plan_clear_plan extends external_api {
-    public static function clear_plan_parameters() {
-        return new external_function_parameters(array(
-            'userid' => new external_value(
-                PARAM_INT,
-                'The id of the user to get the data for',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-            'planid' => new external_value(
-                PARAM_INT,
-                'The id of the plan',
-                VALUE_REQUIRED,
-                null,
-                NULL_NOT_ALLOWED
-            ),
-        ));
+    /**
+     * Parameters for clear_plan.
+     * @return external_function_parameters
+     */
+    public static function clear_plan_parameters(): external_function_parameters {
+        return new external_function_parameters([]);
     }
 
-    public static function clear_plan($userid, $planid) {
-        global $DB;
+    /**
+     * Clear the plan.
+     *
+     * @return void
+     * @throws Exception when access denied
+     */
+    public static function clear_plan() {
+        global $DB, $USER;
 
-        self::validate_parameters(self::clear_plan_parameters(), array('userid' => $userid, 'planid' => $planid));
+        $planid = plan_helper::get_plan_id($USER->id);
 
-        user_helper::assert_access($userid);
-
-        if (!plan_helper::check_edit_permissions($planid, $userid)) {
+        if (!plan_helper::check_edit_permissions($planid, $USER->id)) {
             throw new \Exception('Access denied');
         }
 
-        $DB->delete_records(plan_helper::DEADLINES_TABLE, array('planid' => $planid ));
-
-        $plan = $DB->get_record(plan_helper::TABLE, array('id' => $planid));
-
-        return plan_helper::get_plan($planid);
+        $DB->delete_records(plan_helper::DEADLINES_TABLE, ['planid' => $planid ]);
     }
 
+    /**
+     * Returns the structure of nothing.
+     * @return null
+     */
     public static function clear_plan_returns() {
-        return plan_helper::plan_structure();
+        return null;
     }
 }

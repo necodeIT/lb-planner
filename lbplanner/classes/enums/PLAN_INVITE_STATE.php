@@ -1,5 +1,5 @@
 <?php
-// This file is part of local_lbplanner.
+// This file is part of the local_lbplanner.
 //
 // Moodle is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,21 +14,38 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 /**
- * contains some stuff for the first install of the module
+ * enum for plan invite state
  *
  * @package local_lbplanner
- * @subpackage db
+ * @subpackage enums
  * @copyright 2024 NecodeIT
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-use local_lbplanner\helpers\config_helper;
+namespace local_lbplanner\enums;
 
+// TODO: revert to native enums once we migrate to php8.
+
+use local_lbplanner\polyfill\Enum;
 
 /**
- * Runs when plugin is first installed
+ * States an invite can be in
  */
-function xmldb_local_lbplanner_install() {
-    config_helper::set_default_active_year();
-    config_helper::add_customfield();
+class PLAN_INVITE_STATE extends Enum {
+    /**
+     * pending invite
+     */
+    const PENDING = 0;
+    /**
+     * accepted invite
+     */
+    const ACCEPTED = 1;
+    /**
+     * declined invite
+     */
+    const DECLINED = 2;
+    /**
+     * expired invite
+     */
+    const EXPIRED = 3;
 }

@@ -1,5 +1,5 @@
 <?php
-// This file is part of local_lbplanner.
+// This file is part of the local_lbplanner.
 //
 // Moodle is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,35 +14,36 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 /**
- * contains access levels, i.e. capabilities
+ * case for enums
  *
  * @package local_lbplanner
- * @subpackage db
+ * @subpackage polyfill
  * @copyright 2024 NecodeIT
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+namespace lb_planner_local\polyfill;
+
 defined('MOODLE_INTERNAL') || die();
 
-$capabilities = [
-    'local/lb_planner:student' => [
-        'riskbitmask' => RISK_SPAM,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-    ],
-    'local/lb_planner:teacher' => [
-        'riskbitmask' => RISK_SPAM || RISK_PERSONAL,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-    ],
-    'local/lb_planner:admin' => [
-        'riskbitmask' => RISK_SPAM || RISK_PERSONAL,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-    ],
-    'local/lb_planner:manager' => [
-        'riskbitmask' => RISK_SPAM || RISK_PERSONAL,
-        'captype' => 'write',
-        'contextlevel' => CONTEXT_SYSTEM,
-    ],
-];
+// TODO: revert to native enums once we migrate to php8.
+
+/**
+ * This represents a single case within an Enum
+ */
+class EnumCase {
+    /** @var string the name of the case */
+    public string $name;
+    /** @var string the value of the case */
+    public mixed $value;
+    /**
+     * Constructs an EnumCase
+     *
+     * @param string $name the name of the case
+     * @param mixed $value the value of the case
+     */
+    public function __construct(string $name, mixed $value) {
+        $this->name = $name;
+        $this->value = $value;
+    }
+};
