@@ -3,8 +3,18 @@ import re
 import sys
 from os import path
 
-WARN = "\033[43m\033[30mWARN:\033[0m "
-WARN_TAB = "    \033[43m \033[0m "
+from typing import Any
+
+HAS_WARNED = False
+
+def warn(msg: str, *context: Any):
+    global HAS_WARNED
+    WARN = "\033[43m\033[30mWARN:\033[0m "
+    WARN_TAB = "    \033[43m \033[0m "
+
+    HAS_WARNED = True
+
+    print(WARN, msg, *[str(c).replace('\n', '\n' + WARN_TAB) for c in context])
 
 class SlotsDict:
     @property
@@ -100,11 +110,10 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         if all(value is not None for value in func_dict.values()):
             function_info.append(FunctionInfo(**func_dict))
         else:
-            print(WARN, f"Could not gather all info for {func_dict["function_name"]}")
-            print(WARN_TAB, func_dict)
+            warn(f"Could not gather all info for {func_dict["function_name"]}", func_dict)
 
     if len(function_info) == 0:
-        print(WARN, "Couldn't find any functions!")
+        warn("Couldn't find any functions!")
 
     return function_info
 
@@ -130,9 +139,9 @@ def extract_php_functions(php_code: str, name: str) -> tuple[str | None, str | N
             returns_function = match[0]
 
     if parameters_function is None:
-        print(WARN, f"Couldn't find parameters function in {name}")
+        warn(f"Couldn't find parameters function in {name}")
     if returns_function is None:
-        print(WARN, f"Couldn't find returns function in {name}")
+        warn(f"Couldn't find returns function in {name}")
 
     return parameters_function, returns_function
 
@@ -173,8 +182,7 @@ def parse_phpstuff(inpot: str) -> str:
             if len(matches) == 1:
                 body = matches[0]
             else:
-                print(WARN, "couldn't parse enum", enum_name)
-                print(WARN_TAB, matches)
+                warn(f"couldn't parse enum {enum_name}", matches)
 
         cases = {}
         matches = re.findall(casepattern, body)
@@ -185,7 +193,7 @@ def parse_phpstuff(inpot: str) -> str:
 
         return "{ " + ", ".join([f"{name} = {value}" for name, value in cases.items()]) + " }"
     else:
-        print(WARN, 'unknown phpstuff')
+        warn('unknown phpstuff', inpot)
         return ""
 
 def parse_phpstring(inpot: str) -> str:
@@ -236,8 +244,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
 
     matches = re.findall(redir_pattern, input_str)
     if len(matches) > 1:
-        print(WARN, "Couldn't parse return values in", name)
-        print(WARN_TAB, input_str.replace('\n', '\n' + WARN_TAB))
+        warn(f"Couldn't parse return values in {name}", input_str)
         return ({}, False)
 
     if len(matches) == 1:
@@ -249,7 +256,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
             new_file_content = f.read()
             matches = re.findall(meth_pattern, new_file_content, re.DOTALL)
             if len(matches) == 0:
-                print(WARN, f"Couldn't find {match[0]}::{match[1]}() inside {fp} for {name}")
+                warn(f"Couldn't find {match[0]}::{match[1]}() inside {fp} for {name}")
                 return ({}, False)
             elif len(matches) > 1:
                 raise Exception(f"Found multiple definitions for {match[0]}::{match[1]}() inside {fp}")
@@ -269,8 +276,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
         key = match[0]
         if key is None:
             if len(matches) > 1:
-                print(WARN, "got empty return key name in a structure larger than 1")
-                print(WARN_TAB, matches)
+                warn("got empty return key name in a structure larger than 1", matches)
             else:
                 key = ''
         value_type = match[1]
@@ -280,8 +286,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
 
     if len(output_dict) == 0:
         if re.match(nullensure_pattern, input_str) is None:
-            print(WARN, "could not find any returns in non-empty ", name)
-            print(WARN_TAB, input_str.replace('\n', '\n' + WARN_TAB))
+            warn(f"could not find any returns in non-empty {name}", input_str)
 
     return output_dict, is_multiple_structure
 
@@ -308,8 +313,7 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
     if len(matches) == 0:
         nullensure_pattern = r".*return new external_function_parameters(\s*\[\]\s*);.*"
         if re.match(nullensure_pattern, input_text) is not None:
-            print(WARN, "could not parse params")
-            print(WARN_TAB, input_text.replace('\n', '\n' + WARN_TAB))
+            warn("could not parse params", input_text)
         return {}
 
     result = {}
@@ -364,3 +368,6 @@ if __name__ == "__main__":
 
         with open(f"{sys.argv[1]}/script.js", "w") as f:
             f.write(script)
+
+    if HAS_WARNED:
+        sys.exit(1)
