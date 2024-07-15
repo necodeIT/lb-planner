@@ -49,7 +49,7 @@ class notifications_helper {
                 new external_value(PARAM_INT, 'The type of the event that triggered the notification ' . NOTIF_TRIGGER::format()),
             'info' => new external_value(PARAM_INT, 'Additional information about the notification'),
             'userid' => new external_value(PARAM_INT, 'The ID of the user for whom the notification is for'),
-            'notificationid' => new external_value(PARAM_INT, 'The ID of the notification', NULL_NOT_ALLOWED),
+            'notificationid' => new external_value(PARAM_INT, 'The ID of the notification', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
             'timestamp' => new external_value(PARAM_INT, 'The timestamp of the notification'),
             'timestamp_read' => new external_value(PARAM_INT, 'The timestamp of the notification when it was read'),
         ]);
