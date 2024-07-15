@@ -7,6 +7,8 @@ from typing import Any
 
 HAS_WARNED = False
 
+MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
+
 def warn(msg: str, *context: Any):
     global HAS_WARNED
     WARN = "\033[43m\033[30mWARN:\033[0m "
@@ -27,11 +29,12 @@ class SlotsDict:
         return {name: self.__getattribute__(name) for name in slots}
 
 class ReturnInfo(SlotsDict):
-    __slots__ = ('type', 'description')
+    __slots__ = ('type', 'description', 'nullable')
 
-    def __init__(self, type: str, description: str):
+    def __init__(self, type: str, description: str, nullable: bool):
         self.type = type
         self.description = description
+        self.nullable = nullable
 
 class ParamInfo(SlotsDict):
     __slots__ = ('type', 'description', 'required', 'default_value', 'nullable')
@@ -232,8 +235,6 @@ def parse_phpstring(inpot: str) -> str:
     return "".join(out)
 
 def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[str, ReturnInfo], bool]:
-    # https://regex101.com/r/x8Cgl4/
-    pattern = r"(?:'(\w+)'\s*=>\s*|return )new\s*external_value\((\w+),\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*\w+)?\)"
     # https://regex101.com/r/gUtsX3/
     redir_pattern = r"(\w+)::(\w+)(?<!format)\(\)"
     # https://regex101.com/r/rq5q6w/
@@ -269,7 +270,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
                 else:
                     return result
 
-    matches = re.findall(pattern, input_str)
+    matches = re.findall(MOODLESTRUCT_REGEX, input_str)
 
     output_dict = {}
     for match in matches:
@@ -281,8 +282,22 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
                 key = ''
         value_type = match[1]
         description = parse_phpstring(match[2])
+        required_str = match[4]
+        default_str = match[5]
+        nullable_str = match[6]
 
-        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description)
+        if required_str not in ('VALUE_REQUIRED', ''):
+            warn(f"found optional value in returns structure for {name}", input_str)
+        if default_str not in ('null', ''):
+            warn(f"found non-null 'default value' in returns structure for {name}: {default_str}", input_str)
+        if nullable_str in ('', 'NULL_NOT_ALLOWED'):
+            nullable = False
+        elif nullable_str == 'NULL_ALLOWED':
+            nullable = True # weird, but I'll allow it
+        else:
+            warn(f"found weird value for nullable in {name}: {nullable_str}", input_str)
+
+        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description, nullable)
 
     if len(output_dict) == 0:
         if re.match(nullensure_pattern, input_str) is None:
@@ -304,11 +319,9 @@ def convert_param_type_to_normal_type(param_type: str) -> str:
 
 def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
-    # https://regex101.com/r/h2W6gZ
-    pattern = r"['\"](\w+)['\"]\s*=>\s*new external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*),\s*(\w+),\s*([^,]+?)(?:,\s*(\w+),?)?\s*\)"
 
     # Find all matches of the pattern in the input text
-    matches = re.findall(pattern, input_text)
+    matches = re.findall(MOODLESTRUCT_REGEX, input_text)
 
     if len(matches) == 0:
         nullensure_pattern = r".*return new external_function_parameters(\s*\[\]\s*);.*"
