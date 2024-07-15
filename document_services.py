@@ -14,7 +14,7 @@ def warn(msg: str, *context: Any):
 
     HAS_WARNED = True
 
-    print(WARN, msg, *[str(c).replace('\n', '\n' + WARN_TAB) for c in context])
+    print(WARN, msg, f"\n{WARN_TAB}", *[str(c).replace('\n', '\n' + WARN_TAB) for c in context])
 
 class SlotsDict:
     @property
