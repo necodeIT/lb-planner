@@ -54,7 +54,7 @@ class ParamInfo(SlotsDict):
 class FunctionInfo(SlotsDict):
     __slots__ = ('name', 'group', 'capabilities', 'description', 'path')
 
-    def __init__(self, name: str, group: str, capabilities: str, description: str, path: str):
+    def __init__(self, name: str, group: str, capabilities: list[str], description: str, path: str):
         self.name = name
         self.group = group
         self.capabilities = capabilities
@@ -97,9 +97,9 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         if capabilities is None:
             # check if call needs no capabilities
             capabilities = re.search(r"'capabilities' => ''", function[3])
-            func_dict["capabilities"] = "" if capabilities else None
+            func_dict["capabilities"] = [] if capabilities else None
         else:
-            func_dict["capabilities"] = capabilities.group(1)
+            func_dict["capabilities"] = [cap.strip() for cap in capabilities.group(1).split(',') if len(cap) > 0]
 
         # Extracting description
         description = re.search(r"'description' => '(.*?)'", function[3])
