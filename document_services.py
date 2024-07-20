@@ -9,7 +9,20 @@ HAS_WARNED = False
 
 MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
 
+
+SPECIAL_VARS = {
+    "$USER->id": "derived from token",
+}
+"""
+A map of special variables and the value to replace them with to make them more readable.
+"""
+
+
 def warn(msg: str, *context: Any):
+    """Prints a warning message to the console and sets the global HAS_WARNED variable to True.
+
+    :param str msg: The warning message to print.
+    """
     global HAS_WARNED
     WARN = "\033[43m\033[30mWARN:\033[0m "
     WARN_TAB = "    \033[43m \033[0m "
@@ -336,12 +349,9 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
             convert_param_type_to_normal_type(match[1]),
             parse_phpstring(match[2]),
             True if match[4] == "VALUE_REQUIRED" else False,
-            match[5] if match[5] != "null" else None,
+            SPECIAL_VARS.get(match[5], match[5]) if match[5] != "null" else None,
             False if match[6] == "NULL_NOT_ALLOWED" else True,
         )
-
-    # TODO: replace $USER->id with something less, uh, "raw"
-    # TODO: check if default is either a valid literal or known special variable
 
     return result
 
