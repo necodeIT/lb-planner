@@ -1,0 +1,29 @@
+name: API Doc Parsing
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - LP-55-Backend-Refactor # Temporary. Will be changed to `moodle` when refactor is complete
+
+jobs:
+  generate-api-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          ref: LP-55-Backend-Refactor # This is temporary and will be replaced by `moodle` once the refactor is complete
+          path: moodle
+
+      - name: Setup Python
+        uses: actions/setup-python@v4.7.1
+        with:
+          python-version: '3.10'
+
+      - name: Generate docs
+        working-directory: moodle
+        run: python document_services.py -
