@@ -7,12 +7,10 @@ from typing import Any
 
 HAS_WARNED = False
 
-MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
-
-"""
-A map of special variables and the value to replace them with to make them more readable.
-"""
-
+# https://regex101.com/r/kgCV7K
+MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*" \
+    r"external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)" \
+    r"(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
 
 def warn(msg: str, *context: Any):
     """Prints a warning message to the console and sets the global HAS_WARNED variable to True.
