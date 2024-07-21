@@ -54,7 +54,7 @@ def convert_php_type_to_normal_type(param_type: str) -> str:
 
 def explain_php_value(val: str) -> tuple[None | str | int | bool, str]:
     SPECIAL_VALUES = {
-        "$USER->id": ("current userid", "int"),
+        "$USER->id": ("derived from token", "int"), # this exact phrase is checked for in the web UI
         "null": (None, "")
     }
 
