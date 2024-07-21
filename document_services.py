@@ -2,15 +2,17 @@ import json
 import re
 import sys
 from os import path
+import traceback as tb
 
 from typing import Any
-
-HAS_WARNED = False
 
 # https://regex101.com/r/kgCV7K
 MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*" \
     r"external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)" \
     r"(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
+
+HAS_WARNED = False
+CURRENT_SERVICE: str | None = None
 
 def warn(msg: str, *context: Any):
     """Prints a warning message to the console and sets the global HAS_WARNED variable to True.
@@ -19,16 +21,25 @@ def warn(msg: str, *context: Any):
     """
     global HAS_WARNED
     WARN = "\033[43m\033[30mWARN:\033[0m "
-    WARN_TAB = "    \033[43m \033[0m "
+    WARN_TAB = "    \033[43m\033[33m|\033[0m "
 
     HAS_WARNED = True
 
+    stack = tb.extract_stack()
+    stack_str = " -> ".join([f"\033[34m{frame.name}\033[0m" for frame in stack if frame != stack[-1]])
+
+    service_msg: str
+    if CURRENT_SERVICE is None:
+        service_msg = "outside any service"
+    else:
+        service_msg = f"in service \033[36m{CURRENT_SERVICE}\033[0m"
+
     print(
-        WARN,
-        msg,
-        f"\n{WARN_TAB}",
-        *[str(c).replace('\n', '\n' + WARN_TAB) for c in context],
-        file=sys.stderr
+        f"{WARN}\033[31m{msg}\033[0m {service_msg} ({stack_str})",
+        f"\n{WARN_TAB}  " if len(context) > 0 else "",
+        *[f"\033[2m{c}\033[0m".replace('\n', '\n\033[0m' + WARN_TAB + "  \033[2m") for c in context],
+        file=sys.stderr,
+        sep=""
     )
 
 def convert_php_type_to_normal_type(param_type: str) -> str:
@@ -183,7 +194,7 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         if all(value is not None for value in func_dict.values()):
             function_info.append(FunctionInfo(**func_dict))
         else:
-            warn(f"Could not gather all info for {func_dict["function_name"]}", func_dict)
+            warn(f"Could not gather all info for {func_dict["name"]}", func_dict)
 
     if len(function_info) == 0:
         warn("Couldn't find any functions!")
@@ -218,10 +229,11 @@ def extract_php_functions(php_code: str, name: str) -> tuple[str | None, str | N
 
     return parameters_function, returns_function
 
-def parse_imports(input_str: str, symbol: str) -> str:
+def parse_imports(input_str: str, symbol: str) -> str | None:
     use_pattern = fr"use ((?:\w+\\)+){symbol};"
     uses: list[str] = re.findall(use_pattern, input_str)
 
+    # TODO: actually separate namespaces, check for unknown ones
     namespaces = {
         "local_lbplanner": "classes"# not entirely true, but good enough for now
     }
@@ -236,9 +248,11 @@ def parse_imports(input_str: str, symbol: str) -> str:
         fp_l.append(path.join("lbplanner", *p, f"{symbol}.php"))
 
     if len(fp_l) > 1:
-        raise Exception("found import collision?")
+        warn("found import collision?", input_str)
+        return None
     elif len(fp_l) == 0:
-        raise Exception(f"Couldn't find symbol: {symbol}")
+        warn(f"Couldn't find symbol: {symbol}", input_str)
+        return None
     else:
         return fp_l[0]
 
@@ -250,8 +264,12 @@ def parse_phpstuff(inpot: str) -> str:
         enum_name = inpot[:-10]
         fullbody_pattern = f"class {enum_name} extends Enum {{.*?}}"
 
-        with open(f"lbplanner/classes/enums/{enum_name}.php", "r") as f:
-            matches = re.findall(fullbody_pattern, f.read(), re.DOTALL)
+        fp = f"lbplanner/classes/enums/{enum_name}.php"
+        if not path.exists(fp):
+            warn(f"Couldn't find enum file {fp}")
+            return ""
+        with open(fp, "r") as f:
+            matches: list[str] = re.findall(fullbody_pattern, f.read(), re.DOTALL)
             if len(matches) == 1:
                 body = matches[0]
             else:
@@ -323,6 +341,10 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
         meth_pattern = rf"public static function {match[1]}\(\)(?: ?: ?\w+)? ?{{(?P<body>.*?)}}"
 
         fp = parse_imports(file_content, match[0])
+        if fp is None:
+            # already warned in parse_imports, we don't need to warn again
+            return {}, is_multiple_structure
+
         with open(fp, "r") as f:
             new_file_content = f.read()
             meth_matches: list[str] = re.findall(meth_pattern, new_file_content, re.DOTALL)
@@ -400,6 +422,9 @@ if __name__ == "__main__":
         complete_info = []
 
         for i, info in enumerate(infos):
+
+            CURRENT_SERVICE = info.name
+
             with open(info.path, "r") as func_file:
                 func_content = func_file.read()
                 params_func, returns_func = extract_php_functions(func_content, info.path)
@@ -412,6 +437,8 @@ if __name__ == "__main__":
                 params = parse_params(params_func)
 
                 complete_info.append(FunctionInfoEx(info, params, returns, returns_multiple))
+
+        CURRENT_SERVICE = None
 
         data = json.dumps(complete_info, default=lambda x: x.__dict__)
 
