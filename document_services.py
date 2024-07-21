@@ -174,7 +174,7 @@ def extract_function_info(file_content: str) -> list[FunctionInfo]:
         func_dict["group"] = function[1]
 
         # Extracting and adjusting capabilities
-        capabilities = re.search(r"'capabilities' => '.*:(.*?)'", function[3])
+        capabilities = re.search(r"'capabilities' => '(.*?:.*?)'", function[3])
         if capabilities is None:
             # check if call needs no capabilities
             capabilities = re.search(r"'capabilities' => ''", function[3])
