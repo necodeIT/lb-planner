@@ -29,10 +29,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Clear old documentation in /moodle subdir
-        run: |
-          rm -f docs/moodle/script.js
-
       - name: Generate docs
         working-directory: moodle
         run: python document_services.py ../docs/moodle
