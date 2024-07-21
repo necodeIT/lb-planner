@@ -66,6 +66,24 @@ def explain_php_value(val: str) -> tuple[None | str | int | bool, str]:
         warn("found unknown value", val)
         return (f"unknown: {val}", "unknown")
 
+def parse_isrequired(inpot: str) -> bool | None:
+    if inpot in ('VALUE_REQUIRED', ''):
+        return True
+    elif inpot == 'VALUE_DEFAULT':
+        return False
+    else:
+        warn("found unparseable value for isrequired", inpot)
+        return None
+
+def parse_nullable(inpot: str) -> bool | None:
+    if inpot in ('', 'NULL_NOT_ALLOWED'):
+        return False
+    elif inpot == 'NULL_ALLOWED':
+        return True
+    else:
+        warn(f"found weird value for nullable: {inpot}")
+        return None
+
 class SlotsDict:
     @property
     def __dict__(self):
@@ -79,10 +97,10 @@ class SlotsDict:
 class ReturnInfo(SlotsDict):
     __slots__ = ('type', 'description', 'nullable')
 
-    def __init__(self, type: str, description: str, nullable: bool):
+    def __init__(self, type: str, description: str, nullable: str):
         self.type = convert_php_type_to_normal_type(type)
         self.description = description
-        self.nullable = nullable
+        self.nullable = parse_nullable(nullable)
 
 class ParamInfo(SlotsDict):
     __slots__ = ('type', 'description', 'required', 'default_value', 'nullable')
@@ -90,9 +108,9 @@ class ParamInfo(SlotsDict):
     def __init__(self,
                  type: str,
                  description: str,
-                 required: bool,
+                 required: str,
                  default_value: str,
-                 nullable: bool):
+                 nullable: str):
 
         self.type = convert_php_type_to_normal_type(type)
 
@@ -101,9 +119,9 @@ class ParamInfo(SlotsDict):
             warn(f"Type of default value does not match parameter type - {deftype} != {self.type}", description)
 
         self.description = description
-        self.required = required
+        self.required = parse_isrequired(required)
         self.default_value = defval
-        self.nullable = nullable
+        self.nullable = parse_nullable(nullable)
 
 class FunctionInfo(SlotsDict):
     __slots__ = ('name', 'group', 'capabilities', 'description', 'path')
@@ -297,26 +315,26 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
     # Check for the presence of 'external_multiple_structure'
     is_multiple_structure = "external_multiple_structure" in input_str
 
-    matches = re.findall(redir_pattern, input_str)
-    if len(matches) > 1:
+    redir_matches: list[list[str]] = re.findall(redir_pattern, input_str)
+    if len(redir_matches) > 1:
         warn(f"Couldn't parse return values in {name}", input_str)
         return ({}, False)
 
-    if len(matches) == 1:
-        match = matches[0]
+    if len(redir_matches) == 1:
+        match = redir_matches[0]
         meth_pattern = rf"public static function {match[1]}\(\)(?: ?: ?\w+)? ?{{(?P<body>.*?)}}"
 
         fp = parse_imports(file_content, match[0])
         with open(fp, "r") as f:
             new_file_content = f.read()
-            matches = re.findall(meth_pattern, new_file_content, re.DOTALL)
-            if len(matches) == 0:
+            meth_matches: list[str] = re.findall(meth_pattern, new_file_content, re.DOTALL)
+            if len(meth_matches) == 0:
                 warn(f"Couldn't find {match[0]}::{match[1]}() inside {fp} for {name}")
                 return ({}, False)
-            elif len(matches) > 1:
+            elif len(meth_matches) > 1:
                 raise Exception(f"Found multiple definitions for {match[0]}::{match[1]}() inside {fp}")
             else:
-                result = parse_returns(matches[0], new_file_content, fp)
+                result = parse_returns(meth_matches[0], new_file_content, fp)
 
                 # if multiple_structure is detected here, add it
                 if is_multiple_structure:
@@ -324,7 +342,7 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
                 else:
                     return result
 
-    matches = re.findall(MOODLESTRUCT_REGEX, input_str)
+    matches: list[list[str]] = re.findall(MOODLESTRUCT_REGEX, input_str)
 
     output_dict = {}
     for match in matches:
@@ -334,24 +352,15 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
                 warn("got empty return key name in a structure larger than 1", matches)
             else:
                 key = ''
-        value_type = match[1]
-        description = parse_phpstring(match[2])
-        required_str = match[4]
-        default_str = match[5]
-        nullable_str = match[6]
 
-        if required_str not in ('VALUE_REQUIRED', ''):
+        if not parse_isrequired(match[4]):
             warn(f"found optional value in returns structure for {name}", input_str)
+
+        default_str = match[5]
         if default_str not in ('null', ''):
             warn(f"found non-null 'default value' in returns structure for {name}: {default_str}", input_str)
-        if nullable_str in ('', 'NULL_NOT_ALLOWED'):
-            nullable = False
-        elif nullable_str == 'NULL_ALLOWED':
-            nullable = True # weird, but I'll allow it
-        else:
-            warn(f"found weird value for nullable in {name}: {nullable_str}", input_str)
 
-        output_dict[key] = ReturnInfo(value_type, description, nullable)
+        output_dict[key] = ReturnInfo(match[1], parse_phpstring(match[2]), match[6])
 
     if len(output_dict) == 0:
         if re.match(nullensure_pattern, input_str) is None:
@@ -363,7 +372,7 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
 
     # Find all matches of the pattern in the input text
-    matches = re.findall(MOODLESTRUCT_REGEX, input_text)
+    matches: list[list[str]] = re.findall(MOODLESTRUCT_REGEX, input_text)
 
     if len(matches) == 0:
         nullensure_pattern = r".*return new external_function_parameters(\s*\[\]\s*);.*"
@@ -377,9 +386,9 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
         result[param_name] = ParamInfo(
             match[1],
             parse_phpstring(match[2]),
-            match[4] == "VALUE_REQUIRED",
+            match[4],
             match[5],
-            match[6] != "NULL_NOT_ALLOWED",
+            match[6],
         )
 
     return result
