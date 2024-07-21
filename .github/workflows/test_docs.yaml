@@ -16,7 +16,6 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v3
         with:
-          ref: LP-55-Backend-Refactor # This is temporary and will be replaced by `moodle` once the refactor is complete
           path: moodle
 
       - name: Setup Python
