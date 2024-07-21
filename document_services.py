@@ -9,10 +9,6 @@ HAS_WARNED = False
 
 MOODLESTRUCT_REGEX = r"(?:['\"](\w+)['\"]\s*=>|return)\s*new\s*external_value\s*\(\s*(PARAM_\w+)\s*,\s*((?:(['\"]).+?\4)(?:\s*\.\s*(?:\w+::format\(\))|'.*?')*)(?:,\s*(\w+)(?:,\s*([^,]+?)(?:,\s*(\w+),?)?)?)?\s*\)"
 
-
-SPECIAL_VARS = {
-    "$USER->id": "derived from token",
-}
 """
 A map of special variables and the value to replace them with to make them more readable.
 """
@@ -31,6 +27,39 @@ def warn(msg: str, *context: Any):
 
     print(WARN, msg, f"\n{WARN_TAB}", *[str(c).replace('\n', '\n' + WARN_TAB) for c in context])
 
+def convert_php_type_to_normal_type(param_type: str) -> str:
+    CONVERSIONS = {
+        "PARAM_INT": "int",
+        "PARAM_TEXT": "String",
+        "PARAM_URL": "String",
+        "PARAM_BOOL": "bool",
+    }
+
+    return CONVERSIONS.get(param_type, param_type)
+
+def explain_php_value(val: str) -> tuple[None | str | int | bool, str]:
+    SPECIAL_VALUES = {
+        "$USER->id": ("current userid", "int"),
+        "null": (None, "")
+    }
+
+    if val in SPECIAL_VALUES.keys():
+        return SPECIAL_VALUES[val]
+    elif val.isnumeric():
+        return (int(val), "int")
+    elif val.lower() in ("true", "false"):
+        return (val.lower() == "true", "bool")
+    elif val[0] + val[-1] in ("''", '""'):
+
+        # see if the same kind of quote is within string
+        if val[1:-1].count(val[0]) > 0:
+            warn("found potentially non-literal string", val)
+
+        return (val[1:-1], "String")
+    else:
+        warn("found unknown value", val)
+        return (f"unknown: {val}", "unknown")
+
 class SlotsDict:
     @property
     def __dict__(self):
@@ -45,7 +74,7 @@ class ReturnInfo(SlotsDict):
     __slots__ = ('type', 'description', 'nullable')
 
     def __init__(self, type: str, description: str, nullable: bool):
-        self.type = type
+        self.type = convert_php_type_to_normal_type(type)
         self.description = description
         self.nullable = nullable
 
@@ -56,12 +85,18 @@ class ParamInfo(SlotsDict):
                  type: str,
                  description: str,
                  required: bool,
-                 default_value: str | None,
+                 default_value: str,
                  nullable: bool):
-        self.type = type
+
+        self.type = convert_php_type_to_normal_type(type)
+
+        defval, deftype = explain_php_value(default_value)
+        if defval is not None and deftype != self.type:
+            warn(f"Type of default value does not match parameter type - {deftype} != {self.type}", description)
+
         self.description = description
         self.required = required
-        self.default_value = default_value
+        self.default_value = defval
         self.nullable = nullable
 
 class FunctionInfo(SlotsDict):
@@ -310,25 +345,13 @@ def parse_returns(input_str: str, file_content: str, name: str) -> tuple[dict[st
         else:
             warn(f"found weird value for nullable in {name}: {nullable_str}", input_str)
 
-        output_dict[key] = ReturnInfo(convert_param_type_to_normal_type(value_type), description, nullable)
+        output_dict[key] = ReturnInfo(value_type, description, nullable)
 
     if len(output_dict) == 0:
         if re.match(nullensure_pattern, input_str) is None:
             warn(f"could not find any returns in non-empty {name}", input_str)
 
     return output_dict, is_multiple_structure
-
-
-def convert_param_type_to_normal_type(param_type: str) -> str:
-    CONVERSIONS = {
-        "PARAM_INT": "int",
-        "PARAM_TEXT": "String",
-        "PARAM_URL": "String",
-        "PARAM_BOOL": "bool",
-    }
-
-    return CONVERSIONS.get(param_type, param_type)
-
 
 def parse_params(input_text: str) -> dict[str, ParamInfo]:
     # Regular expression to match the parameters inside the 'new external_value()' function
@@ -346,11 +369,11 @@ def parse_params(input_text: str) -> dict[str, ParamInfo]:
     for match in matches:
         param_name = match[0]
         result[param_name] = ParamInfo(
-            convert_param_type_to_normal_type(match[1]),
+            match[1],
             parse_phpstring(match[2]),
-            True if match[4] == "VALUE_REQUIRED" else False,
-            SPECIAL_VARS.get(match[5], match[5]) if match[5] != "null" else None,
-            False if match[6] == "NULL_NOT_ALLOWED" else True,
+            match[4] == "VALUE_REQUIRED",
+            match[5],
+            match[6] != "NULL_NOT_ALLOWED",
         )
 
     return result
