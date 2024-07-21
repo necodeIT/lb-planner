@@ -25,7 +25,13 @@ def warn(msg: str, *context: Any):
 
     HAS_WARNED = True
 
-    print(WARN, msg, f"\n{WARN_TAB}", *[str(c).replace('\n', '\n' + WARN_TAB) for c in context])
+    print(
+        WARN,
+        msg,
+        f"\n{WARN_TAB}",
+        *[str(c).replace('\n', '\n' + WARN_TAB) for c in context],
+        file=sys.stderr
+    )
 
 def convert_php_type_to_normal_type(param_type: str) -> str:
     CONVERSIONS = {
@@ -401,19 +407,23 @@ if __name__ == "__main__":
                 complete_info.append(FunctionInfoEx(info, params, returns, returns_multiple))
 
         data = json.dumps(complete_info, default=lambda x: x.__dict__)
-        declaration = f"const funcs = {data}"
 
-        script: str
-        with open(f"{sys.argv[1]}/script.js", "r") as f:
-            script = f.read()
-            lines = script.splitlines()
-            for i in range(len(lines)):
-                if lines[i].startswith('const funcs = '):
-                    lines[i] = declaration
-            script = "\n".join(lines)
+        if sys.argv[1] == "-":
+            print(data)
+        else:
+            declaration = f"const funcs = {data}"
 
-        with open(f"{sys.argv[1]}/script.js", "w") as f:
-            f.write(script)
+            script: str
+            with open(f"{sys.argv[1]}/script.js", "r") as f:
+                script = f.read()
+                lines = script.splitlines()
+                for i in range(len(lines)):
+                    if lines[i].startswith('const funcs = '):
+                        lines[i] = declaration
+                script = "\n".join(lines)
+
+            with open(f"{sys.argv[1]}/script.js", "w") as f:
+                f.write(script)
 
     if HAS_WARNED:
         sys.exit(1)
