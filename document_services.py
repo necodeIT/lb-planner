@@ -233,22 +233,19 @@ def parse_imports(input_str: str, symbol: str) -> str | None:
     use_pattern = fr"use ((?:\w+\\)+){symbol};"
     uses: list[str] = re.findall(use_pattern, input_str)
 
-    # TODO: actually separate namespaces, check for unknown ones
-    namespaces = {
-        "local_lbplanner": "classes"# not entirely true, but good enough for now
+    namespaces = { # it's technically possible to import from outside /classes/
+        "local_lbplanner\\helpers": "classes/helpers",
+        "local_lbplanner\\enums": "classes/enums",
+        "local_lbplanner\\polyfill": "classes/polyfill"
     }
     fp_l: list[str] = []
     for use in uses:
-        p = use.split('\\')[:-1]
-
-        namespace = namespaces.get(p[0])
-        if namespace is not None:
-            p[0] = namespace
-
-        fp_l.append(path.join("lbplanner", *p, f"{symbol}.php"))
+        for namespace, p in namespaces.items():
+            if use.startswith(namespace):
+                fp_l.append(path.join(path.dirname(__file__), "lbplanner", p, f"{symbol}.php"))
 
     if len(fp_l) > 1:
-        warn("found import collision?", input_str)
+        warn(f"found potential import collision for {symbol}", input_str)
         return None
     elif len(fp_l) == 0:
         warn(f"Couldn't find symbol: {symbol}", input_str)
