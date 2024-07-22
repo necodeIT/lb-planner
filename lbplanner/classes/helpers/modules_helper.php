@@ -24,7 +24,12 @@
 
 namespace local_lbplanner\helpers;
 
-use block_accessreview\external\get_module_data;
+
+use core_customfield\category;
+use local_lbplanner\helpers\config_helper;
+use core_customfield\category_controller;
+use customfield_select\data_controller;
+use customfield_select\field_controller;
 use external_function_parameters;
 use external_single_structure;
 use external_value;
@@ -35,42 +40,6 @@ use local_lbplanner\enums\{MODULE_STATUS, MODULE_GRADE, MODULE_TYPE};
  * Contains helper functions for working with modules.
  */
 class modules_helper {
-
-    /**
-     * Table where modules are stored.
-     */
-    const ASSIGN_TABLE = 'assign';
-
-    /**
-     * Table where max. and min. grades of the modules are stored.
-     */
-    const GRADE_ITEMS_TABLE = 'grade_items';
-
-    /**
-     * Table where course modules are stored.
-     */
-    const COURSE_MODULES_TABLE = 'course_modules';
-
-    /**
-     * Table where grades of the modules are stored.
-     */
-    const GRADES_TABLE = 'assign_grades';
-
-    /**
-     * Table where grading scales are stored.
-     */
-    const SCALE_TABLE = 'scale';
-
-    /**
-     * Table where submissions of the modules are stored.
-     */
-    const SUBMISSIONS_TABLE = 'assign_submission';
-
-    /**
-     * Submitted status name of a submission.
-     */
-    const SUBMISSION_STATUS_SUBMITTED = 'submitted';
-
     /**
      * The return structure of a module.
      *
@@ -146,9 +115,10 @@ class modules_helper {
      * Maps the given name to a module type.
      *
      * @param string $modulename The name of the module.
+     * @param int $cmid The coursemodule id of the module.
      * @return integer The enum value for the module type.
      */
-    public static function determin_type(string $modulename): int {
+    public static function determin_type(string $modulename, int $cmid): int {
         // Convert module name to uppercase.
         $modulename = strtoupper($modulename);
 
@@ -170,6 +140,22 @@ class modules_helper {
         if (strpos($modulename, '[M]') !== false) {
             return MODULE_TYPE::M;
         }
+        $categorycontroller = category_controller::create(config_helper::get_category_id());
+        $datacontroller = $categorycontroller->get_handler()->get_instance_data($cmid)[0];
+        $type = intval($datacontroller->get('value'));
+        if ($type == 1) {
+            return MODULE_TYPE::GK;
+        } else if ($type == 2) {
+            return MODULE_TYPE::EK;
+        } else if ($type == 3) {
+            return MODULE_TYPE::GK;
+        } else if ($type == 4) {
+            return MODULE_TYPE::TEST;
+        } else if ($type == 5) {
+            return MODULE_TYPE::TEST;
+        } else if ($type == 6) {
+            return MODULE_TYPE::M;
+        }
 
         // Return TYPE_NONE elswise.
         return MODULE_TYPE::NONE;
@@ -182,15 +168,9 @@ class modules_helper {
      * @param int $courseid The id of the course.
      * @return string The url of the module.
      */
-    public static function get_module_url(int $moduleid, int $courseid): string {
-        global $DB;
-
-        $view = $DB->get_record(
-            self::COURSE_MODULES_TABLE,
-            ['course' => $courseid, 'instance' => $moduleid, 'module' => 1]
-        );
-
-        return strval(new moodle_url('/mod/assign/view.php?id='.$view->id));
+    public static function get_module_url(string $type, int $cmid): string {
+        $url = new moodle_url('/mod/'.$type.'/view.php', ['id' => $cmid]);
+        return $url->out(false);
     }
 
     /**

@@ -20,6 +20,7 @@ use external_api;
 use external_function_parameters;
 use external_single_structure;
 use external_value;
+use local_lbplanner\helpers\course_helper;
 use local_lbplanner\helpers\modules_helper;
 use local_lbplanner\helpers\plan_helper;
 use local_lbplanner\helpers\user_helper;
@@ -40,7 +41,6 @@ class modules_get_module extends external_api {
     public static function get_module_parameters(): external_function_parameters {
         return new external_function_parameters([
             'moduleid' => new external_value(PARAM_INT, 'The id of the module', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
-            'userid' => new external_value(PARAM_INT, 'The id of the user', VALUE_REQUIRED, null, NULL_NOT_ALLOWED),
         ]);
     }
 
@@ -48,21 +48,14 @@ class modules_get_module extends external_api {
      * Returns the data for a module
      *
      * @param int $moduleid The ID of the course
-     * @param int $userid The ID of the user
      * @return array the module
      */
-    public static function get_module(int $moduleid, int $userid): array {
+    public static function get_module(int $moduleid): array {
         global $DB;
 
-        self::validate_parameters(self::get_module_parameters(), ['moduleid' => $moduleid, 'userid' => $userid]);
+        self::validate_parameters(self::get_module_parameters(), ['moduleid' => $moduleid]);
 
-        user_helper::assert_access($userid);
-
-        if (!$DB->record_exists(modules_helper::MDL_ASSIGN_TABLE, ['id' => $moduleid])) {
-            throw new \moodle_exception('Module not found');
-        }
-
-        return modules_helper::get_module($moduleid, $userid);
+        return modules_helper::get_module($moduleid);
     }
 
     /**

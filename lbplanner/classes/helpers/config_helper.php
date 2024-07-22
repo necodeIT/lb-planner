@@ -67,9 +67,10 @@ class config_helper {
      */
     public static function add_customfield(): void {
         // Check if the category is already created and only create it if it doesn't exist.
-        // Check if plugin "modcustomfields" is installed and create the category and the custom field.
+        // TODO: When the plugin gets uninstalled, the category should be deleted as well.
+        // TODO: Or check if it is already there when reinstalling.
         if (!get_config('local_lbplanner', 'categoryid')) {
-
+            // Check if plugin "modcustomfields" is installed and create the category and the custom field.
             if (array_key_exists('modcustomfields', core_component::get_plugin_list('local'))) {
 
                 $handler = mod_handler::create();

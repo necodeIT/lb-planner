@@ -26,15 +26,19 @@ use local_lbplanner\helpers\config_helper;
 
 /**
  * Upgrades the DB version
- * right now it only sets the default active year
+ * This function does anything necessary to upgrade the plugin from an old version to the current version.
  *
  * @param mixed $oldversion (unused) the previous version to upgrade from
  * @return bool true
  */
 function xmldb_local_lbplanner_upgrade($oldversion): bool {
-    if ($oldversion < 2024022700) {
+    if ($oldversion < 2024022703) {
         config_helper::set_default_active_year();
-        config_helper::add_customfield();
+        try {
+            config_helper::add_customfield();
+        } catch (coding_exception $e) {
+            new moodle_exception('error_adding_customfield', 'local_lbplanner', '', $e->getMessage());
+        }
     }
     return true;
 }

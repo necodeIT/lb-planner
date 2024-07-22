@@ -1,5 +1,5 @@
 <?php
-// This file is part of local_lbplanner.
+// This file is part of the local_lbplanner.
 //
 // Moodle is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,23 +14,36 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 /**
- * Defines versioning
+ * Collection of helper classes for handling modules
  *
  * @package local_lbplanner
+ * @subpackage helpers
  * @copyright 2024 NecodeIT
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
+namespace local_lbplanner\model;
 
-$release = '0.0.0';
+class activity {
+    public $moduleid;
+    public $name;
+    public $courseid;
+    public $status;
+    public $type;
+    public $url;
+    public $grade;
+    public $deadline;
+    public $modtype;
+    public function __construct($moduleid, $name, $courseid, $status, $modtype, $type, $url, $grade, $deadline) {
+        $this->modtype = $modtype;
+        $this->moduleid = $moduleid;
+        $this->name = $name;
+        $this->courseid = $courseid;
+        $this->status = $status;
+        $this->type = $type;
+        $this->url = $url;
+        $this->grade = $grade;
+        $this->deadline = $deadline;
+    }
+}
 
-$plugin->component = 'local_lbplanner';
-$plugin->release = 'Alpha v.'.$release;
-$plugin->version = 2024031301;
-$plugin->dependencies = [
-    // Depend upon version 2023110600 of local_modcustomfields.
-    'local_modcustomfields' => 2023110600,
-];
-
-set_config('release', $release, 'local_lbplanner');
