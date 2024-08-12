@@ -1,0 +1,9 @@
+{
+	"lspclient": {
+		"servers": {
+			"php" : {
+				"root": "../moodle/"
+			}
+		}
+	}
+}

@@ -114,5 +114,58 @@
 				<KEY NAME="lastmodifiedby" TYPE="foreign" FIELDS="userid" REFTABLE="local_lbplanner_users" REFFIELDS="userid" />
 			</KEYS>
 		</TABLE>
+		<TABLE NAME="local_lbplanner_slots" COMMENT="All avaliable slots">
+			<FIELDS>
+				<FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+				<FIELD NAME="startunit" TYPE="int" LENGTH="2" NOTNULL="true" SEQUENCE="false" COMMENT="The school unit this slot starts in (8:00 is unit 1)"/>
+				<FIELD NAME="duration" TYPE="int" LENGTH="1" NOTNULL="true" SEQUENCE="false" COMMENT="The duration of the slot in school units"/>
+				<FIELD NAME="weekday" TYPE="int" LENGTH="1" NOTNULL="true" SEQUENCE="false" COMMENT="The day of the week, starting with monday at 1"/>
+				<FIELD NAME="room" TYPE="char" LENGTH="7" NOTNULL="true" SEQUENCE="false" COMMENT="The name of the associated room"/>
+				<FIELD NAME="size" TYPE="int" LENGTH="3" SEQUENCE="false" COMMENT="The amount of students that can fitin this slot"/>
+			</FIELDS>
+			<KEYS>
+				<KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+			</KEYS>
+		</TABLE>
+		<TABLE NAME="local_lbplanner_reservations" COMMENT="Reservations for slots">
+			<FIELDS>
+				<FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+				<FIELD NAME="slotid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="ID of the slot this reservation belongs to"/>
+				<FIELD NAME="date" TYPE="datetime" NOTNULL="true" SEQUENCE="false" COMMENT="The date this reservation is taking place on"/>
+				<FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="ID of the user which has got this slot reserved"/>
+				<FIELD NAME="reserverid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="ID of the user which reserved this slot"/>
+			</FIELDS>
+			<KEYS>
+				<KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+				<KEY NAME="slotid" TYPE="foreign" FIELDS="slotid" REFTABLE="local_lbplanner_slots" REFFIELDS="slotid"/>
+				<KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="local_lbplanner_users" REFFIELDS="userid"/>
+				<KEY NAME="reserverid" TYPE="foreign" FIELDS="userid" REFTABLE="local_lbplanner_users" REFFIELDS="userid"/>
+			</KEYS>
+		</TABLE>
+		<TABLE NAME="local_lbplanner_slot_courses" COMMENT="Courses and classes that slots belong to">
+			<FIELDS>
+				<FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+				<FIELD NAME="slotid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+				<FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="ID of the course associated with this slot or NULL if any"/>
+				<FIELD NAME="vintage" TYPE="char" LENGTH="7" NOTNULL="false" SEQUENCE="false" COMMENT="Name of the associated class or NULL if any"/>
+			</FIELDS>
+			<KEYS>
+				<KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+				<KEY NAME="slotid" TYPE="foreign" FIELDS="slotid" REFTABLE="local_lbplanner_slots" REFFIELDS="id"/>
+				<KEY NAME="courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="local_lbplanner_courses" REFFIELDS="courseid"/>
+			</KEYS>
+		</TABLE>
+		<TABLE NAME="local_lbplanner_supervisors" COMMENT="supervisors for slots">
+			<FIELDS>
+				<FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+				<FIELD NAME="slotid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+				<FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+			</FIELDS>
+			<KEYS>
+				<KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+				<KEY NAME="slotid" TYPE="foreign" FIELDS="slotid" REFTABLE="local_lbplanner_slots" REFFIELDS="id"/>
+				<KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="local_lbplanner_users" REFFIELDS="userid"/>
+			</KEYS>
+		</TABLE>
 	</TABLES>
 </XMLDB>

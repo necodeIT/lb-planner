@@ -34,7 +34,7 @@ class plan_set_deadline extends external_api {
      * Parameters for set_deadline.
      * @return external_function_parameters
      */
-    public static function set_deadline_parameters() {
+    public static function set_deadline_parameters(): external_function_parameters {
         return new external_function_parameters([
             'moduleid' => new external_value(
                 PARAM_INT,
@@ -69,7 +69,7 @@ class plan_set_deadline extends external_api {
      * @return void
      * @throws \moodle_exception when access denied
      */
-    public static function set_deadline(int $moduleid, int $deadlinestart, int $deadlineend): external_function_parameters {
+    public static function set_deadline(int $moduleid, int $deadlinestart, int $deadlineend) {
         global $DB, $USER;
 
         self::validate_parameters(
