@@ -2,6 +2,12 @@
 
 LB Planner is an application designed to help students plan and organize their self-taught studying by tracking and managing their modules. It provides an easy-to-use interface that allows users to stay on top of their academic goals. For more information, please visit our [website](https://projekte.tgm.ac.at/lb-planner/).
 
+> [!IMPORTANT]  
+> This repository has been split into seperate repos:
+> - [App Repository](https://github.com/necodeIT/lb_planner_app)
+> - [Plugin Repository](https://github.com/necodeIT/lb_planner_plugin)
+> - [Docs Repository](https://github.com/necodeIT/lb_planner_docs)
+
 ## Compile Instructions
 
 1. Clone the repository to your local machine.
